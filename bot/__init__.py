@@ -1,4 +1,4 @@
-"""Sets up optimizations for event loop and imports necessary modules."""
+"""Defines optimizations for event loop."""
 import asyncio
 import os
 

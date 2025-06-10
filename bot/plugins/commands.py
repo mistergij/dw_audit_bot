@@ -1,11 +1,12 @@
 """Plugin that contains all commands for the bot."""
 import asyncio
 from collections.abc import Sequence
+import os
 
 import crescent
 import hikari
 
-from bot.utils import Plugin, RunAudit
+from bot.utils import Plugin
 
 plugin = Plugin()
 
@@ -50,8 +51,10 @@ class AuditCommand:
     message_iterable = None
 
     async def get_messages(self) -> Sequence[hikari.Message]:
-        run_audit = RunAudit(self.before_raw, self.after_raw)
-        before_aware, after_aware = run_audit.convert_dates()
+        before_aware, after_aware = plugin.model.convert_dates(
+            self.before_raw,
+            self.after_raw
+        )
         message_iterable = plugin.app.rest.fetch_messages(
             self.channel_id,
             before=before_aware,
@@ -60,6 +63,11 @@ class AuditCommand:
         return await message_iterable
 
     async def callback(self, ctx: crescent.Context) -> None:
+        if not plugin.model.avrae:
+            plugin.model.avrae = plugin.app.cache.get_user(
+                int(os.environ["AVRAE_ID"])
+            )
+
         try:
             await asyncio.wait_for(self.get_messages(), timeout=2.0)
         except asyncio.TimeoutError:
@@ -70,4 +78,3 @@ class AuditCommand:
                 "No messages found in the specified date range."
             )
             return
-        

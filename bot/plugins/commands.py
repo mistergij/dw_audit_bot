@@ -1,10 +1,13 @@
 """Plugin that contains all commands for the bot."""
+# pyright: reportOptionalMemberAccess=false, reportOptionalSubscript=false
 import asyncio
 from collections.abc import Sequence
+import io
 import os
 
 import crescent
 import hikari
+import pandas as pd
 
 from bot.utils import Plugin
 
@@ -48,26 +51,22 @@ class AuditCommand:
         int,
         description="The ID of the channel to audit.",
     )
-    message_iterable = None
+    def __init__(self):
+        self.message_iterable: Sequence[hikari.Message] | None = None
 
     async def get_messages(self) -> Sequence[hikari.Message]:
         before_aware, after_aware = plugin.model.convert_dates(
             self.before_raw,
             self.after_raw
         )
-        message_iterable = plugin.app.rest.fetch_messages(
+        message_iterable_return = plugin.app.rest.fetch_messages(
             self.channel_id,
             before=before_aware,
             after=after_aware,
         )
-        return await message_iterable
+        return await message_iterable_return
 
     async def callback(self, ctx: crescent.Context) -> None:
-        if not plugin.model.avrae:
-            plugin.model.avrae = plugin.app.cache.get_user(
-                int(os.environ["AVRAE_ID"])
-            )
-
         try:
             await asyncio.wait_for(self.get_messages(), timeout=2.0)
         except asyncio.TimeoutError:
@@ -78,3 +77,77 @@ class AuditCommand:
                 "No messages found in the specified date range."
             )
             return
+
+        csv_dict = {
+            "Date": [],
+            "DTD Remaining": [],
+            "Current Lifestyle": [],
+            "Prior Purse": [],
+            "Current Purse": [],
+            "Payout": [],
+            "XP": [],
+        }
+        for message in self.message_iterable:
+            if message.author.mention[2:18] != os.environ["DISCORD_USER_ID"]:
+                continue
+            message_embed = message.embeds[0]
+
+            if (
+                    message_embed.title is not None
+                    and "Downtime Activity" in message_embed.title
+            ):
+                csv_dict["Date"].append(message.timestamp)
+                csv_dict["DTD Remaining"].append(
+                    message_embed.description.count("◉")
+                )
+
+                lifestyle_start = message_embed.description.find(
+                    "Current Lifestyle"
+                )
+                lifestyle_end = message_embed.description[
+                    lifestyle_start:
+                ].find("\n")
+                csv_dict["Current Lifestyle"].append(
+                    message_embed.description[
+                        lifestyle_start + 21:
+                        lifestyle_start + lifestyle_end
+                    ]
+                )
+
+                prior_purse_start = message_embed.description.find(
+                    "Coin Purse"
+                )
+                prior_purse_end = message_embed.description[
+                    prior_purse_start:
+                ].find("gp")
+                prior_purse_value = message_embed.description[
+                        prior_purse_start + 14:
+                        prior_purse_start + prior_purse_end
+                    ]
+                csv_dict["Prior Purse"].append(prior_purse_value)
+
+                current_purse_start = prior_purse_end + 6
+                current_purse_end = message_embed.description[
+                    current_purse_start:
+                ].find("gp")
+                current_purse_value = message_embed.description[
+                        current_purse_start:
+                        current_purse_start + current_purse_end
+                    ]
+                csv_dict["Current Purse"].append(current_purse_value)
+
+                payout_value: int = (
+                        int(current_purse_value)
+                        - int(prior_purse_value)
+                )
+                csv_dict["Payout"].append(payout_value)
+
+        csv_dataframe = pd.DataFrame(csv_dict)
+        csv_dataframe_string = csv_dataframe.to_csv(index=False)
+        csv_dataframe_file = io.StringIO(csv_dataframe_string)
+        csv_dataframe_file_hikari = hikari.Bytes(
+            csv_dataframe_file,
+            "audit.csv",
+            "text/csv",
+        )
+        await ctx.respond(attachment=csv_dataframe_file_hikari)

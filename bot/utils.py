@@ -1,4 +1,4 @@
-"""Define utility variables, functions, and classes for the bot."""
+"""Define utility alias for crescent plugins with AuditModel context."""
 import crescent
 import hikari
 

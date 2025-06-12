@@ -1,8 +1,6 @@
-import dataclasses
+"""Model class used for auditing functionality. This is made available to plugins."""
 from datetime import datetime
 from zoneinfo import ZoneInfo
-
-import hikari
 
 class AuditModel:
     """Class that defines methods to audit the server's logs."""
@@ -16,7 +14,6 @@ class AuditModel:
           current_time_zone -- The timezone to use for date conversions.
         """
         self.current_time_zone = current_time_zone
-        self.avrae: hikari.User | None = None
 
     def convert_dates(self,
                       before_raw: str,

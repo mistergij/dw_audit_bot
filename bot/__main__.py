@@ -1,15 +1,13 @@
-import os
-
 import crescent
 import dotenv
 import hikari
 
 from bot.audit_model import AuditModel
-from bot.utils import Plugin
+from bot.utils import DISCORD_TOKEN
 
 dotenv.load_dotenv()
 
-audit_bot = hikari.GatewayBot(os.environ["DISCORD_TOKEN"])
+audit_bot = hikari.GatewayBot(DISCORD_TOKEN) # pyright: ignore
 
 audit_model = AuditModel()
 

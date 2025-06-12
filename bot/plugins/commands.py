@@ -95,14 +95,14 @@ class AuditCommand:
                 message_embed = message.embeds[0]
             except IndexError:
                 continue
-            # await ctx.respond(message_embed.description)
+
             player_id_start = message_embed.description.find(
                 "**Player"
             ) + 14
             if player_id_start == -1:
                 continue
             player_id_end = player_id_start + 18
-            # await ctx.respond(message_embed.description[player_id_start:player_id_end])
+
             if (
                     message_embed.title is not None
                     and "Downtime Activity" in message_embed.title
@@ -121,14 +121,7 @@ class AuditCommand:
                 lifestyle_end = message_embed.description[
                     lifestyle_start:
                 ].find("\n")
-                """
-                await ctx.respond(
-                    message_embed.description[
-                        lifestyle_start + 21:
-                        lifestyle_start + lifestyle_end
-                    ]
-                )
-                """
+
                 csv_dict["Current Lifestyle"].append(
                     message_embed.description[
                         lifestyle_start + 21:
@@ -152,14 +145,7 @@ class AuditCommand:
                 current_purse_end = message_embed.description[
                     current_purse_start:
                 ].find("gp")
-                """
-                await ctx.respond(
-                    message_embed.description[
-                        current_purse_start:
-                        current_purse_start + current_purse_end
-                    ]
-                )
-                """
+
                 current_purse_value = message_embed.description[
                         current_purse_start:
                         current_purse_start + current_purse_end

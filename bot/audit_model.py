@@ -15,25 +15,18 @@ class AuditModel:
         """
         self.current_time_zone = current_time_zone
 
-    def convert_dates(self,
-                      before_raw: str,
-                      after_raw: str) -> tuple[datetime, datetime]:
+    def convert_dates(self, after_raw: str) -> datetime:
         """Convert the raw date strings to EST/EDT datetime objects.
 
         Arguments:
-          before_raw -- The audit's start date in the format YYYY-MM-DD.
-          after_raw -- The audit's end date in the format YYYY-MM-DD.
+          after_raw -- The audit's end date in the string format YYYY-MM-DD.
 
         Returns:
-          A tuple containing two datetime objects: (before, after).
+          A time-aware datetime object representing the end date of the audit.
         """
-        before = datetime.strptime(
-            before_raw,
-            "%Y-%m-%d",
-        ).replace(tzinfo=self.current_time_zone)
         after = datetime.strptime(
             after_raw,
             "%Y-%m-%d",
         ).replace(tzinfo=self.current_time_zone)
 
-        return before, after
+        return after

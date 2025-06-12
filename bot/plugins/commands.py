@@ -35,12 +35,6 @@ class AuditCommand:
                       Defaults to Midnight EST/EDT.
       channel_id -- The ID of the channel to audit.
     """
-    before_raw = crescent.option(
-        str,
-        name="before",
-        description="The start date for the audit. Must be in the format "
-                    "YYYY-MM-DD. Defaults to Midnight EST/EDT.",
-    )
     after_raw = crescent.option(
         str,
         name="after",
@@ -48,20 +42,16 @@ class AuditCommand:
                     "YYYY-MM-DD. Defaults to Midnight EST/EDT.",
     )
     channel_id = crescent.option(
-        int,
+        str,
         description="The ID of the channel to audit.",
     )
     def __init__(self):
         self.message_iterable: Sequence[hikari.Message] | None = None
 
     async def get_messages(self) -> Sequence[hikari.Message]:
-        before_aware, after_aware = plugin.model.convert_dates(
-            self.before_raw,
-            self.after_raw
-        )
+        after_aware = plugin.model.convert_dates(self.after_raw)
         message_iterable_return = plugin.app.rest.fetch_messages(
-            self.channel_id,
-            before=before_aware,
+            int(self.channel_id),
             after=after_aware,
         )
         return await message_iterable_return
@@ -72,7 +62,7 @@ class AuditCommand:
         except asyncio.TimeoutError:
             await ctx.defer(ephemeral=True)
             self.message_iterable = await self.get_messages()
-        if not self.message_iterable:
+        if self.message_iterable is None:
             await ctx.respond(
                 "No messages found in the specified date range."
             )

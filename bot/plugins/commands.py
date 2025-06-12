@@ -57,6 +57,7 @@ class AuditCommand:
         self.message_iterable: Sequence[hikari.Message] | None = None
 
     async def get_messages(self) -> None:
+        """Fetches messages from the specified channel within the date range."""
         after_aware = plugin.model.convert_dates(self.after_raw)
         message_iterable_return = plugin.app.rest.fetch_messages(
             int(self.channel_id),
@@ -65,6 +66,7 @@ class AuditCommand:
         self.message_iterator = message_iterable_return
 
     async def callback(self, ctx: crescent.Context) -> None:
+        """Callback for the audit command."""
         await ctx.defer()
         await ctx.respond(
             "Fetching messages, this may take a while...",

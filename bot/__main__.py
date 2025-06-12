@@ -1,3 +1,4 @@
+"""Main entry point for the audit bot."""
 import crescent
 import dotenv
 import hikari

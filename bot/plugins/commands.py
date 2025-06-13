@@ -23,7 +23,7 @@ async def ping(ctx: crescent.Context) -> None:
     await ctx.respond(f"Pong!\nLatency: {current_latency * 1000:.2f} ms")
 
 @plugin.include
-@crescent.command(name="audit",
+@crescent.command(name="audit_dtd",
                   description="Performs a new audit of the server's logs.",
                   )
 class AuditCommand:

@@ -1,4 +1,4 @@
-"""Defines optimizations for event loop.
+"""Defines optimizations for event loop and defines the main entry point for Kensa.
 Copyright © 2025 Dnd World
 
 This file is part of Kensa.
@@ -17,11 +17,23 @@ You should have received a copy of the GNU General Public License along with Ken
 import asyncio
 import os
 
+import crescent
+import hikari
+
+from bot.audit_model import AuditModel
+from bot.utils import DISCORD_TOKEN
+
 if os.name != "nt":
     import uvloop
 
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
-from __main__ import main
+audit_bot = hikari.GatewayBot(DISCORD_TOKEN)  # pyright: ignore
 
-__all__ = ["main"]
+audit_model = AuditModel()
+
+client = crescent.Client(audit_bot, audit_model)
+client.plugins.load_folder("bot.plugins")
+
+def main():
+    audit_bot.run()

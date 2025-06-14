@@ -1,4 +1,4 @@
-"""Main entry point for the audit bot.
+"""Executes the main entry point for Kensa.
 Copyright © 2025 Dnd World
 
 This file is part of Kensa.
@@ -13,24 +13,6 @@ details.
 You should have received a copy of the GNU General Public License along with Kensa. If not, see
 <https://www.gnu.org/licenses/>.
 """
+from bot import main
 
-import crescent
-import hikari
-
-from bot.audit_model import AuditModel
-from bot.utils import DISCORD_TOKEN
-
-audit_bot = hikari.GatewayBot(DISCORD_TOKEN)  # pyright: ignore
-
-audit_model = AuditModel()
-
-client = crescent.Client(audit_bot, audit_model)
-client.plugins.load_folder("bot.plugins")
-
-
-def main():
-    audit_bot.run()
-
-
-if __name__ == "__main__":
-    main()
+main()

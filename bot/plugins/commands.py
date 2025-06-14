@@ -15,7 +15,6 @@ plugin = Plugin()
 @plugin.include
 @crescent.command(
     description="Ping the bot to check if it's online.",
-    default_member_permissions=hikari.Permissions.ADMINISTRATOR,
 )
 async def ping(ctx: crescent.Context) -> None:
     """Returns the bot's latency in milliseconds."""

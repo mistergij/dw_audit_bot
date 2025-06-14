@@ -1,13 +1,15 @@
 """Define utility functions and constants for the bot."""
+
 import os
 
 import crescent
-import dotenv
 import hikari
+from dotenv import find_dotenv, load_dotenv
 
 from bot.audit_model import AuditModel
 
-dotenv.load_dotenv()
+load_dotenv(find_dotenv(usecwd=True))
+
 Plugin = crescent.Plugin[hikari.GatewayBot, AuditModel]
 
 DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")

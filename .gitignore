@@ -1,1 +1,10 @@
-/.env
+# Secrets
+.env
+
+# Nix
+.direnv/
+result
+
+# Python
+.ruff_cache
+.ropeproject

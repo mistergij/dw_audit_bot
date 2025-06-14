@@ -19,5 +19,10 @@ find = {}
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
+[dependency-groups]
+dev = [
+    "ruff>=0.11.13",
+]
+
 [tool.ruff]
 line-length = 120

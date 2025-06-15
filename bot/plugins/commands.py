@@ -20,7 +20,8 @@ import io
 
 import crescent
 import hikari
-import pandas as pd
+import polars as pl
+import re2
 
 from bot.utils import AVRAE_ID, Plugin
 
@@ -97,14 +98,16 @@ class AuditCommand:
             await ctx.respond("No messages found in the specified date range.")
             return
 
-        csv_dict = {
-            "Date": [],
-            "DTD Remaining": [],
-            "Current Lifestyle": [],
-            "Prior Purse": [],
-            "Current Purse": [],
-            "Payout": [],
+        schema = {
+            "Date": pl.Date,
+            "DTD Remaining": pl.UInt8,
+            "Current Lifestyle": pl.String,
+            "Prior Purse": pl.Float32,
+            "Current Purse": pl.Float32,
+            "Payout": pl.Float32,
         }
+        csv_df = pl.DataFrame(schema)
+
         for message in self.message_iterable:
             if message.author.mention != AVRAE_ID:
                 continue
@@ -113,53 +116,55 @@ class AuditCommand:
             except IndexError:
                 continue
 
-            player_id_start = message_embed.description.find("**Player") + 14
-            if player_id_start == -1:
-                continue
-            player_id_end = player_id_start + 18
+            player_id = re2.search(message_embed.description, r".+<@(\d+)").group(0)
 
             if (
                 message_embed.title is not None
                 and "Downtime Activity" in message_embed.title
-                and message_embed.description[player_id_start:player_id_end] == self.user_id
+                and player_id == self.user_id
             ):
-                csv_dict["Date"].append(message.timestamp.date())
-                csv_dict["DTD Remaining"].append(message_embed.description.count("◉"))
-
-                lifestyle_start = message_embed.description.find("Current Lifestyle")
-                lifestyle_end = message_embed.description[lifestyle_start:].find("\n")
-
-                csv_dict["Current Lifestyle"].append(
-                    message_embed.description[lifestyle_start + 21 : lifestyle_start + lifestyle_end]
-                )
-
-                prior_purse_start = message_embed.description.find("**Coin Purse")
-                prior_purse_end = message_embed.description[prior_purse_start:].find("gp")
-                prior_purse_value = message_embed.description[
-                    prior_purse_start + 16 : prior_purse_start + prior_purse_end
-                ]
-                csv_dict["Prior Purse"].append(prior_purse_value)
-
-                current_purse_start = prior_purse_start + prior_purse_end + 6
-                current_purse_end = message_embed.description[current_purse_start:].find("gp")
-
-                current_purse_value = message_embed.description[
-                    current_purse_start : current_purse_start + current_purse_end
-                ]
-                csv_dict["Current Purse"].append(current_purse_value)
-
-                payout_value: float = round(
-                    float(current_purse_value) - float(prior_purse_value),
+                prior_purse = round(
+                    float(
+                        re2.search(message_embed.description, r"(?:Purse|Automated\))[*]{2}:?\s([0-9.]+)gp").group(0)
+                    ),
                     2,
                 )
-                csv_dict["Payout"].append(payout_value)
+                current_purse = round(float(re2.search(message_embed.description, r"-> ([0-9.]+)gp").group(0)), 2)
 
-        csv_dataframe = pd.DataFrame(csv_dict)
-        csv_dataframe_string = csv_dataframe.to_csv(index=False)
-        csv_dataframe_file = io.StringIO(csv_dataframe_string)
-        csv_dataframe_file_hikari = hikari.Bytes(
-            csv_dataframe_file,
+                csv_df.vstack(
+                    pl.DataFrame(
+                        {
+                            "Date": [message.timestamp.date()],
+                            "DTD Remaining": [message_embed.description.count("◉")],
+                            "Current Lifestyle": [
+                                re2.search(
+                                    message_embed.description,
+                                    r".+Lifestyle:?[*]{2}:? (\w+)",
+                                ).group(0)
+                            ],
+                            "Prior Purse": [
+                                prior_purse,
+                            ],
+                            "Current Purse": [
+                                current_purse,
+                            ],
+                            "Payout": [
+                                round(
+                                    current_purse - prior_purse,
+                                    2,
+                                )
+                            ],
+                        },
+                        schema=schema,
+                    ),
+                    in_place=True,
+                )
+
+        csv_df_string = csv_df.write_csv()
+        csv_df_file = io.StringIO(csv_df_string)
+        csv_df_file_hikari = hikari.Bytes(
+            csv_df_file,
             "audit.csv",
             "text/csv",
         )
-        await ctx.respond(attachment=csv_dataframe_file_hikari)
+        await ctx.respond(attachment=csv_df_file_hikari)

@@ -23,7 +23,7 @@ import hikari
 import polars as pl
 import re2
 
-from bot.utils import AVRAE_ID, Plugin
+from bot.utils import AVRAE_ID, GUILD_ID, Plugin
 
 plugin = Plugin()
 
@@ -106,7 +106,7 @@ class AuditCommand:
             "Current Purse": pl.Float32,
             "Payout": pl.Float32,
         }
-        csv_df = pl.DataFrame(schema)
+        csv_df = pl.DataFrame(schema=schema)
 
         for message in self.message_iterable:
             if message.author.mention != AVRAE_ID:
@@ -115,32 +115,61 @@ class AuditCommand:
                 message_embed = message.embeds[0]
             except IndexError:
                 continue
+            if len(message_embed.fields) > 0 and message_embed.fields[0].name == "DTD":
+                continue
+            if message_embed.description is None:
+                continue
 
-            player_id = re2.search(message_embed.description, r".+<@(\d+)").group(0)
+            player_id = re2.search(r".+<@(\d+)", message_embed.description)
+            player_id = player_id.group(1) if player_id is not None else None
 
             if (
                 message_embed.title is not None
                 and "Downtime Activity" in message_embed.title
                 and player_id == self.user_id
             ):
-                prior_purse = round(
-                    float(
-                        re2.search(message_embed.description, r"(?:Purse|Automated\))[*]{2}:?\s([0-9.]+)gp").group(0)
-                    ),
-                    2,
-                )
-                current_purse = round(float(re2.search(message_embed.description, r"-> ([0-9.]+)gp").group(0)), 2)
-
+                message_embed_description = message_embed.description
+                # await ctx.respond(f"https://discord.com/channels/{GUILD_ID}/{message.channel_id}/{message.id}")
+                try:
+                    prior_purse = round(
+                        float(
+                            re2.search(
+                                r"(?:Purse|Automated\)):?[*]{2}:?\s([0-9.]+)gp", message_embed_description
+                            ).group(1)
+                        ),
+                        2,
+                    )
+                except AttributeError:
+                    if message.id == 1386721361820647595:
+                        print("Found")
+                    prior_purse = round(
+                        float(
+                            re2.search(
+                                r"(?:Purse|Automated\)):?[*]{2}:?\s([0-9.]+)gp", message_embed.fields[0].value
+                            ).group(1)
+                        ),
+                        2,
+                    )
+                try:
+                    current_purse = round(float(re2.search(r"-> ([0-9.]+)gp", message_embed_description).group(1)), 2)
+                except AttributeError:
+                    current_purse = round(
+                        float(re2.search(r"-> ([0-9.]+)gp", message_embed.fields[0].value).group(1)), 2
+                    )
+                try:
+                    current_lifestyle = re2.search(
+                        r".+Lifestyle:?[*]{2}:? (\w+)",
+                        message_embed_description,
+                    ).group(1)
+                except AttributeError:
+                    current_lifestyle = "Unknown"
                 csv_df.vstack(
                     pl.DataFrame(
                         {
                             "Date": [message.timestamp.date()],
-                            "DTD Remaining": [message_embed.description.count("◉")],
+                            "DTD Remaining": [message_embed_description.count("◉")],
                             "Current Lifestyle": [
-                                re2.search(
-                                    message_embed.description,
-                                    r".+Lifestyle:?[*]{2}:? (\w+)",
-                                ).group(0)
+                                current_lifestyle
                             ],
                             "Prior Purse": [
                                 prior_purse,

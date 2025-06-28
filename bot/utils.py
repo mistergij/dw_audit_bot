@@ -33,3 +33,7 @@ if DISCORD_TOKEN is None:
 AVRAE_ID = os.environ.get("AVRAE_ID")
 if AVRAE_ID is None:
     raise ValueError("AVRAE_ID environment variable is not set.")
+
+GUILD_ID = os.environ.get("GUILD_ID")
+if GUILD_ID is None:
+    raise ValueError("GUILD_ID environment variable is not set.")

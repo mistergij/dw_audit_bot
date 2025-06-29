@@ -37,3 +37,25 @@ if AVRAE_ID is None:
 GUILD_ID = os.environ.get("GUILD_ID")
 if GUILD_ID is None:
     raise ValueError("GUILD_ID environment variable is not set.")
+
+MAIN_DATABASE_PATH = os.path.join(os.getcwd(), "bot", "resources", "database.sqlite")
+GUILD_DATABASE_PATH = os.path.join(os.getcwd(), "bot", "resources", "guild.sqlite")
+GUILD_DTD_LIST = [
+    "alchem",
+    "arcana",
+    "armam",
+    "assassinate",
+    "crime",
+    "cult",
+    "explore",
+    "farm",
+    "med",
+    "merc",
+    "merchant",
+    "patrol",
+    "research",
+    "scribe",
+    "showtime",
+    "works",
+    "healer",
+]

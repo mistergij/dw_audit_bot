@@ -1,4 +1,4 @@
-"""Plugin that contains all commands for the bot.
+"""Plugin that contains all audit commands for the bot.
 Copyright © 2025 Dnd World
 
 This file is part of Kensa.

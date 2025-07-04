@@ -15,13 +15,16 @@ You should have received a copy of the GNU General Public License along with Ken
 """
 
 import aiosqlite
+import crescent
 
-from bot.utils import *
+from bot.utils import Plugin, GUILD_DATABASE_PATH, GUILD_DTD_LIST, MAIN_DATABASE_PATH
 
 plugin = Plugin()
+group = crescent.Group("database")
 
 
 @plugin.include
+@group.child
 @crescent.command(description="Creates the guild DTD database and corresponding tables")
 async def create_guild_database(ctx: crescent.Context):
     async with aiosqlite.connect(MAIN_DATABASE_PATH) as c:
@@ -41,3 +44,18 @@ async def create_guild_database(ctx: crescent.Context):
                 );"""
             )
     await ctx.respond("Database created.")
+
+
+@plugin.include
+@group.child
+@crescent.command(name="query_database", description="Sends an SQL query to the database for debugging purposes")
+class QueryDatabase:
+    query = crescent.option(str, "The query to pass to the table")
+
+    async def callback(self, ctx: crescent.Context) -> None:
+        async with aiosqlite.connect(MAIN_DATABASE_PATH) as c:
+            await c.execute(f'ATTACH DATABASE "{GUILD_DATABASE_PATH}" AS guild;')
+            await c.commit()
+            result = await c.execute(self.query)
+
+        await ctx.respond(result)

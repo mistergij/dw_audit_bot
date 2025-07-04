@@ -35,5 +35,6 @@ audit_model = AuditModel()
 client = crescent.Client(audit_bot, audit_model)
 client.plugins.load_folder("bot.plugins")
 
+
 def main():
     audit_bot.run()

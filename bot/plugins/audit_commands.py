@@ -23,7 +23,7 @@ import hikari
 import polars as pl
 import re2
 
-from bot.utils import AVRAE_ID, GUILD_ID, Plugin
+from bot.utils import AVRAE_ID, Plugin
 
 plugin = Plugin()
 
@@ -168,9 +168,7 @@ class AuditCommand:
                         {
                             "Date": [message.timestamp.date()],
                             "DTD Remaining": [message_embed_description.count("◉")],
-                            "Current Lifestyle": [
-                                current_lifestyle
-                            ],
+                            "Current Lifestyle": [current_lifestyle],
                             "Prior Purse": [
                                 prior_purse,
                             ],

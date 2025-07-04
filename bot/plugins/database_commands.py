@@ -56,6 +56,6 @@ class QueryDatabase:
         async with aiosqlite.connect(MAIN_DATABASE_PATH) as c:
             await c.execute(f'ATTACH DATABASE "{GUILD_DATABASE_PATH}" AS guild;')
             await c.commit()
-            result = await c.execute(self.query)
-
+            async with c.execute(self.query) as cursor:
+                result = await cursor.fetchall()
         await ctx.respond(result)

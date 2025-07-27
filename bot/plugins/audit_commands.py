@@ -23,15 +23,14 @@ import hikari
 import polars as pl
 import re2
 
-from bot.utils import AVRAE_ID, Plugin
+from bot.constants import AVRAE_ID, Plugin
+import bot.converters as cvt
 
 plugin = Plugin()
 
 
 @plugin.include
-@crescent.command(
-    description="Ping the bot to check if it's online.",
-)
+@crescent.command(description="Ping the bot to check if it's online.")
 async def ping(ctx: crescent.Context) -> None:
     """Returns the bot's latency in milliseconds."""
     current_latency = plugin.app.heartbeat_latency
@@ -47,10 +46,9 @@ class AuditCommand:
     """Command to perform an audit of the server's logs.
 
     Arguments:
-      before_raw -- The start date for the audit in the format YYYY-MM-DD.
-                      Defaults to Midnight EST/EDT.
       after_raw -- The end date for the audit in the format YYYY-MM-DD.
                       Defaults to Midnight EST/EDT.
+      user_id -- The ID of the user to audit.
       channel_id -- The ID of the channel to audit.
     """
 
@@ -76,7 +74,7 @@ class AuditCommand:
 
     async def get_messages(self) -> None:
         """Fetches messages from the specified channel within the date range."""
-        after_aware = plugin.model.convert_dates(self.after_raw)
+        after_aware = cvt.convert_date(self.after_raw)
         message_iterable_return = plugin.app.rest.fetch_messages(
             int(self.channel_id),
             after=after_aware,

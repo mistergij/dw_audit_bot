@@ -1,4 +1,4 @@
-"""Defines optimizations for event loop and defines the main entry point for Kensa.
+"""Defines a database class for variable storage.
 Copyright © 2025 Dnd World
 
 This file is part of Kensa.
@@ -14,25 +14,14 @@ You should have received a copy of the GNU General Public License along with Ken
 <https://www.gnu.org/licenses/>.
 """
 
-import asyncio
-import os
+from dataclasses import dataclass
 
-import crescent
-import hikari
-
-from bot.constants import DISCORD_TOKEN
-
-if os.name != "nt":
-    import uvloop
-
-    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-
-audit_bot = hikari.GatewayBot(DISCORD_TOKEN)  # pyright: ignore
+import aiosqlite
 
 
-client = crescent.Client(audit_bot)
-client.plugins.load_folder("bot.plugins")
+@dataclass
+class Database:
+    """Class to keep track of Kensa's SQLite databases"""
 
-
-def main():
-    audit_bot.run()
+    connection: aiosqlite.Connection = None
+    latest_audit: str = None

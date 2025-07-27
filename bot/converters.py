@@ -1,4 +1,4 @@
-"""Defines optimizations for event loop and defines the main entry point for Kensa.
+"""Defines various conversion functions for the bot.
 Copyright © 2025 Dnd World
 
 This file is part of Kensa.
@@ -14,25 +14,28 @@ You should have received a copy of the GNU General Public License along with Ken
 <https://www.gnu.org/licenses/>.
 """
 
-import asyncio
-import os
-
-import crescent
-import hikari
-
-from bot.constants import DISCORD_TOKEN
-
-if os.name != "nt":
-    import uvloop
-
-    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-
-audit_bot = hikari.GatewayBot(DISCORD_TOKEN)  # pyright: ignore
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 
-client = crescent.Client(audit_bot)
-client.plugins.load_folder("bot.plugins")
+def to_int(value: str) -> int:
+    return int(value)
 
 
-def main():
-    audit_bot.run()
+def convert_day(value: int) -> str:
+    return f"{value:02d}"
+
+
+def convert_date(after_raw: str) -> datetime:
+    """Convert the raw date strings to EST/EDT datetime objects.
+
+    Arguments:
+      after_raw -- The audit's end date in the string format YYYY-MM-DD.
+
+    Returns:
+      A time-aware datetime object representing the end date of the audit.
+    """
+    return datetime.strptime(
+        after_raw,
+        "%Y-%m-%d",
+    ).replace(tzinfo=ZoneInfo("America/New_York"))

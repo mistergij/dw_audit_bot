@@ -1,4 +1,4 @@
-"""Define utility functions and constants for the bot.
+"""Defines various constants for the bot.
 Copyright © 2025 Dnd World
 
 This file is part of Kensa.
@@ -20,11 +20,10 @@ import crescent
 import hikari
 from dotenv import find_dotenv, load_dotenv
 
-from bot.audit_model import AuditModel
 
 load_dotenv(find_dotenv(usecwd=True))
 
-Plugin = crescent.Plugin[hikari.GatewayBot, AuditModel]
+Plugin = crescent.Plugin[hikari.GatewayBot, None]
 
 DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
 if DISCORD_TOKEN is None:
@@ -40,6 +39,7 @@ if GUILD_ID is None:
 
 MAIN_DATABASE_PATH = os.path.join(os.getcwd(), "bot", "resources", "database.sqlite")
 GUILD_DATABASE_PATH = os.path.join(os.getcwd(), "bot", "resources", "guild.sqlite")
+LATEST_AUDIT_PATH = os.path.join(os.getcwd(), "bot", "resources", "latest_audit.txt")
 GUILD_DTD_LIST = [
     "alchem",
     "arcana",
@@ -59,3 +59,32 @@ GUILD_DTD_LIST = [
     "works",
     "healer",
 ]
+MONTH_AUTOCOMPLETE = [
+    ("January", "01"),
+    ("February", "02"),
+    ("March", "03"),
+    ("April", "04"),
+    ("May", "05"),
+    ("June", "06"),
+    ("July", "07"),
+    ("August", "08"),
+    ("September", "09"),
+    ("October", "10"),
+    ("November", "11"),
+    ("December", "12"),
+]
+
+DAY_DICTIONARY = {
+    "01": 31,
+    "02": 28,
+    "03": 31,
+    "04": 30,
+    "05": 31,
+    "06": 30,
+    "07": 31,
+    "08": 31,
+    "09": 30,
+    "10": 31,
+    "11": 30,
+    "12": 31,
+}

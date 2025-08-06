@@ -30,12 +30,24 @@ def convert_date(after_raw: str) -> datetime:
     """Convert the raw date strings to EST/EDT datetime objects.
 
     Arguments:
-      after_raw -- The audit's end date in the string format YYYY-MM-DD.
+      after_raw -- The date in the string format YYYY-MM-DD.
 
     Returns:
-      A time-aware datetime object representing the end date of the audit.
+      A time-aware datetime object representing the date.
     """
     return datetime.strptime(
         after_raw,
         "%Y-%m-%d",
     ).replace(tzinfo=ZoneInfo("America/New_York"))
+
+
+def convert_epoch(epoch: float) -> datetime:
+    """Convert the raw date in UNIX Epoch to EST/EDT datetime objects.
+
+    Arguments:
+      epoch -- The UNIX epoch time to convert.
+
+    Returns:
+      A time-aware datetime object representing the corresponding UNIX epoch time.
+    """
+    return datetime.fromtimestamp(epoch).replace(tzinfo=ZoneInfo("America/New_York"))

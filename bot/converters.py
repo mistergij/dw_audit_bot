@@ -14,8 +14,16 @@ You should have received a copy of the GNU General Public License along with Ken
 <https://www.gnu.org/licenses/>.
 """
 
+import datetime
 from datetime import datetime
 from zoneinfo import ZoneInfo
+
+import hikari
+import polars as pl
+import re2
+
+from bot.database import Database
+from bot.constants import GUILD_DTD_DICT
 
 
 def to_int(value: str) -> int:
@@ -26,7 +34,7 @@ def convert_day(value: int) -> str:
     return f"{value:02d}"
 
 
-def convert_date(after_raw: str) -> datetime:
+def convert_date(raw_string: str) -> datetime:
     """Convert the raw date strings to EST/EDT datetime objects.
 
     Arguments:
@@ -36,7 +44,7 @@ def convert_date(after_raw: str) -> datetime:
       A time-aware datetime object representing the date.
     """
     return datetime.strptime(
-        after_raw,
+        raw_string,
         "%Y-%m-%d",
     ).replace(tzinfo=ZoneInfo("America/New_York"))
 

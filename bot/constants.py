@@ -40,25 +40,42 @@ if GUILD_ID is None:
 MAIN_DATABASE_PATH = os.path.join(os.getcwd(), "bot", "resources", "database.sqlite")
 GUILD_DATABASE_PATH = os.path.join(os.getcwd(), "bot", "resources", "guild.sqlite")
 LATEST_AUDIT_PATH = os.path.join(os.getcwd(), "bot", "resources", "latest_audit.txt")
-GUILD_DTD_LIST = [
+GUILD_DTD_DICT = {
     "alchem",
+    0,
     "arcana",
+    1,
     "armam",
+    2,
     "assassinate",
+    3,
     "crime",
+    4,
     "cult",
+    5,
     "explore",
+    6,
     "farm",
+    7,
     "med",
+    8,
     "merc",
+    9,
     "merchant",
+    10,
     "patrol",
+    11,
     "research",
+    12,
     "scribe",
+    13,
     "showtime",
+    14,
     "works",
+    15,
     "healer",
-]
+    16,
+}
 MONTH_AUTOCOMPLETE = [
     ("January", "01"),
     ("February", "02"),

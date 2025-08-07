@@ -18,13 +18,6 @@ import datetime
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-import hikari
-import polars as pl
-import re2
-
-from bot.database import Database
-from bot.constants import GUILD_DTD_DICT
-
 
 def to_int(value: str) -> int:
     return int(value)

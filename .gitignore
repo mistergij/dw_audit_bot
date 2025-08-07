@@ -14,4 +14,4 @@ dw_audit_bot.egg-info/
 /bot/resources/*.sqlite
 
 # Storage
-/bot/resources/latest_audit.txt
+/bot/resources/earliest_audit.txt

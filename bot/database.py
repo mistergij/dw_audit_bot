@@ -25,4 +25,3 @@ class Database:
 
     connection: aiosqlite.Connection = None
     earliest_audit: float = None
-    latest_audit: float = None

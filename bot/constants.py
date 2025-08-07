@@ -39,7 +39,7 @@ if GUILD_ID is None:
 
 MAIN_DATABASE_PATH = os.path.join(os.getcwd(), "bot", "resources", "database.sqlite")
 GUILD_DATABASE_PATH = os.path.join(os.getcwd(), "bot", "resources", "guild.sqlite")
-LATEST_AUDIT_PATH = os.path.join(os.getcwd(), "bot", "resources", "latest_audit.txt")
+EARLIEST_AUDIT_PATH = os.path.join(os.getcwd(), "bot", "resources", "earliest_audit.txt")
 GUILD_DTD_DICT = {
     "alchem",
     0,

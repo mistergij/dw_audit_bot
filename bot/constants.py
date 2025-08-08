@@ -76,7 +76,7 @@ GUILD_DTD_DICT = {
     "healer",
     16,
 }
-MONTH_AUTOCOMPLETE = [
+MONTH_CHOICES = [
     ("January", "01"),
     ("February", "02"),
     ("March", "03"),

@@ -31,7 +31,7 @@ from bot.constants import (
     GUILD_ID,
     EARLIEST_AUDIT_PATH,
     MAIN_DATABASE_PATH,
-    MONTH_AUTOCOMPLETE,
+    MONTH_CHOICES,
 )
 import bot.converters as cvt
 from bot.database import Database
@@ -39,13 +39,6 @@ from bot.database import Database
 plugin = Plugin()
 database = Database()
 database_commands = crescent.Group("database")
-
-
-async def autocomplete_month(
-    ctx: crescent.AutocompleteContext,
-    option: hikari.AutocompleteInteractionOption,
-) -> Sequence[tuple[str, str]]:
-    return MONTH_AUTOCOMPLETE
 
 
 @plugin.include
@@ -148,7 +141,7 @@ class AuditGuildDTDs:
         str,
         description="The year after which to audit.",
     ).convert(cvt.to_int)
-    month = crescent.option(str, description="The month after which to audit.", autocomplete=autocomplete_month)
+    month = crescent.option(str, description="The month after which to audit.", choices=MONTH_CHOICES)
     day = crescent.option(int, description="The day after which to audit.").convert(cvt.convert_day)
 
     async def filter_guild_messages(

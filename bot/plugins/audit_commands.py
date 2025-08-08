@@ -14,19 +14,12 @@ You should have received a copy of the GNU General Public License along with Ken
 <https://www.gnu.org/licenses/>.
 """
 
-# pyright: reportOptionalMemberAccess=false, reportOptionalSubscript=false
-from collections.abc import Sequence
-import io
-
 import crescent
-import hikari
-import polars as pl
-import re2
 
-from bot.constants import AVRAE_ID, Plugin
-import bot.converters as cvt
+from bot.constants import Plugin
 
 plugin = Plugin()
+audit_commands = crescent.Group("audit")
 
 
 @plugin.include
@@ -38,158 +31,29 @@ async def ping(ctx: crescent.Context) -> None:
 
 
 @plugin.include
-@crescent.command(
-    name="audit_dtd",
-    description="Performs a new audit of the server's logs.",
-)
-class AuditCommand:
-    """Command to perform an audit of the server's logs.
-
-    Arguments:
-      after_raw -- The end date for the audit in the format YYYY-MM-DD.
-                      Defaults to Midnight EST/EDT.
-      user_id -- The ID of the user to audit.
-      channel_id -- The ID of the channel to audit.
-    """
-
+@audit_commands.child
+@crescent.command(name="get_message", description="Performs a new audit of the server's logs.")
+class GetMessage:
     channel_id = crescent.option(
-        str,
-        name="channel",
-        description="The ID of the channel to audit.",
+        str, description="The ID of the message's channel.", choices=[("#dtd-automated-log", "579777361117970465")]
     )
-    user_id = crescent.option(
+    message_id = crescent.option(
         str,
-        name="user",
-        description="The ID of the user to audit.",
+        description="The ID of the message.",
     )
-    after_raw = crescent.option(
-        str,
-        name="after",
-        description="The end date for the audit. Must be in the format YYYY-MM-DD. Defaults to Midnight EST/EDT.",
+    content_type = crescent.option(
+        int, description="The type of content you want to return", choices=[("message", 0), ("embed", 1)]
     )
 
-    def __init__(self):
-        self.message_iterator: hikari.LazyIterator[hikari.Message] | None = None
-        self.message_iterable: Sequence[hikari.Message] | None = None
-
-    async def get_messages(self) -> None:
-        """Fetches messages from the specified channel within the date range."""
-        after_aware = cvt.convert_date(self.after_raw)
-        message_iterable_return = plugin.app.rest.fetch_messages(
-            int(self.channel_id),
-            after=after_aware,
-        )
-        self.message_iterator = message_iterable_return
-
-    async def callback(self, ctx: crescent.Context) -> None:
-        """Callback for the audit command."""
-        await ctx.defer()
-        await ctx.respond(
-            "Fetching messages, this may take a while...",
-            ephemeral=True,
-        )
-        await self.get_messages()
-
-        if self.message_iterator is not None:
-            self.message_iterable = await self.message_iterator
+    async def callback(self, ctx: crescent.Context):
+        message = await plugin.app.rest.fetch_message(int(self.channel_id), int(self.message_id))
+        if self.content_type == 0:
+            await ctx.respond(message)
         else:
-            await ctx.respond("No messages found in the specified date range.")
-            return
-
-        schema = {
-            "Date": pl.Date,
-            "DTD Remaining": pl.UInt8,
-            "Current Lifestyle": pl.String,
-            "Prior Purse": pl.Float32,
-            "Current Purse": pl.Float32,
-            "Payout": pl.Float32,
-        }
-        csv_df = pl.DataFrame(schema=schema)
-
-        for message in self.message_iterable:
-            if message.author.mention != AVRAE_ID:
-                continue
-            try:
-                message_embed = message.embeds[0]
-            except IndexError:
-                continue
-            if len(message_embed.fields) > 0 and message_embed.fields[0].name == "DTD":
-                continue
-            if message_embed.description is None:
-                continue
-
-            player_id = re2.search(r".+<@(\d+)", message_embed.description)
-            player_id = player_id.group(1) if player_id is not None else None
-
-            if (
-                message_embed.title is not None
-                and "Downtime Activity" in message_embed.title
-                and player_id == self.user_id
-            ):
-                message_embed_description = message_embed.description
-                # await ctx.respond(f"https://discord.com/channels/{GUILD_ID}/{message.channel_id}/{message.id}")
-                try:
-                    prior_purse = round(
-                        float(
-                            re2.search(
-                                r"(?:Purse|Automated\)):?[*]{2}:?\s([0-9.]+)gp", message_embed_description
-                            ).group(1)
-                        ),
-                        2,
-                    )
-                except AttributeError:
-                    if message.id == 1386721361820647595:
-                        print("Found")
-                    prior_purse = round(
-                        float(
-                            re2.search(
-                                r"(?:Purse|Automated\)):?[*]{2}:?\s([0-9.]+)gp", message_embed.fields[0].value
-                            ).group(1)
-                        ),
-                        2,
-                    )
-                try:
-                    current_purse = round(float(re2.search(r"-> ([0-9.]+)gp", message_embed_description).group(1)), 2)
-                except AttributeError:
-                    current_purse = round(
-                        float(re2.search(r"-> ([0-9.]+)gp", message_embed.fields[0].value).group(1)), 2
-                    )
-                try:
-                    current_lifestyle = re2.search(
-                        r".+Lifestyle:?[*]{2}:? (\w+)",
-                        message_embed_description,
-                    ).group(1)
-                except AttributeError:
-                    current_lifestyle = "Unknown"
-                csv_df.vstack(
-                    pl.DataFrame(
-                        {
-                            "Date": [message.timestamp.date()],
-                            "DTD Remaining": [message_embed_description.count("◉")],
-                            "Current Lifestyle": [current_lifestyle],
-                            "Prior Purse": [
-                                prior_purse,
-                            ],
-                            "Current Purse": [
-                                current_purse,
-                            ],
-                            "Payout": [
-                                round(
-                                    current_purse - prior_purse,
-                                    2,
-                                )
-                            ],
-                        },
-                        schema=schema,
-                    ),
-                    in_place=True,
-                )
-
-        csv_df_string = csv_df.write_csv()
-        csv_df_file = io.StringIO(csv_df_string)
-        csv_df_file_hikari = hikari.Bytes(
-            csv_df_file,
-            "audit.csv",
-            "text/csv",
-        )
-        await ctx.respond(attachment=csv_df_file_hikari)
+            embed = message.embeds[0]
+            await ctx.respond(
+                f"**Title:** `{embed.title}`\n"
+                f"**Description:** ```{embed.description}```\n"
+                f"**Fields:** {''.join([f'\nField {i}: \n```{value}```' for i, value in enumerate(embed.fields)])}\n"
+                f"**Footer:** `{embed.footer}`\n"
+            )

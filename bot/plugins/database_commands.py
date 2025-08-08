@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License along with Ken
 
 from collections.abc import Sequence
 import io
+import time
 
 import aiosqlite
 import crescent
@@ -136,7 +137,6 @@ class AuditGuildDTDs:
             "user_name": pl.String,
             "char_name": pl.String,
         }
-        self.csv_df: pl.DataFrame = pl.DataFrame(schema=self.schema)
 
     # TODO: Add autocomplete for channel IDs
     channel_id = crescent.option(
@@ -172,7 +172,7 @@ class AuditGuildDTDs:
                 footer = embed.footer.text[7:]
                 dtd_name = re2.match(r"\w+", footer)[0]
 
-                if dtd_name not in GUILD_DTD_DICT:
+                if dtd_name not in GUILD_DTD_DICT or "Insufficient downtime" in description:
                     continue
 
                 message_id = message.id
@@ -183,7 +183,7 @@ class AuditGuildDTDs:
                 lifestyle = re2.search(r"Lifestyle:?\*\*:? ([^\n\r]+)", description)
                 injuries = re2.search(r"Injuries:?\*\*:? ([^\n\r]+)", description)
                 user_id_and_name = re2.search(r"Player:?\*\*:? <@(\d+)> `([^`\n\r]+)", description)
-                char_name = re2.search(r"Character:?\*\*:? ([^(]+)", description)
+                char_name = re2.search(r"Character:?\*\*:? ([^\n]+)(?= \(\d+\))", description)
 
                 try:
                     await database.connection.execute(f"""INSERT INTO guild VALUES (
@@ -195,39 +195,22 @@ class AuditGuildDTDs:
                                                       "{"Unknown" if lifestyle is None else lifestyle[1]}",
                                                       "{"None" if injuries is None else injuries[1]}",
                                                       "{dtd_name}",
-                                                      {user_id_and_name[1]},
-                                                      '{str.replace(user_id_and_name[2], "'", "''").rstrip()}',
+                                                      {0 if user_id_and_name is None else user_id_and_name[1]},
+                                                      '{"Unknown" if user_id_and_name is None else str.replace(user_id_and_name[2], "'", "''").rstrip()}',
                                                       '{str.replace(char_name[1], "'", "''").rstrip()}'
                                                       );""")
                     await database.connection.commit()
                 except aiosqlite.IntegrityError:
                     continue
-
-                self.csv_df.vstack(
-                    pl.DataFrame(
-                        {
-                            "message_id": message_id,
-                            "message_timestamp": message_timestamp.timestamp(),
-                            "remaining_dtd": dtd_remaining,
-                            "old_purse": 0 if old_purse is None else float(old_purse[1]),
-                            "new_purse": 0 if new_purse is None else float(new_purse[1]),
-                            "lifestyle": "Unknown" if lifestyle is None else lifestyle[1],
-                            "injuries": "None" if injuries is None else injuries[1],
-                            "dtd_type": dtd_name,
-                            "user_id": int(user_id_and_name[1]),
-                            "user_name": user_id_and_name[2].rstrip(),
-                            "char_name": char_name[1].rstrip(),
-                        },
-                        schema=self.schema,
-                    ),
-                    in_place=True,
-                )
+                except TypeError:
+                    print(f"Unexpected Error! Message Link: https://discord.com/channels/{GUILD_ID}/{self.channel_id}/{message.id}")
 
             # Handles if message does not have an Embed or if Embed doesn't have a Footer
             except (IndexError, AttributeError):
                 pass
 
     async def callback(self, ctx: crescent.Context) -> None:
+        start = time.perf_counter()
         await ctx.defer()
         aware_date = cvt.convert_date(f"{self.year}-{self.month}-{self.day}")
 
@@ -244,13 +227,6 @@ class AuditGuildDTDs:
         except TypeError:
             database.earliest_audit = aware_date.timestamp()
 
-        # Fetch all messages already in database
-        sql_df = pl.read_database_uri(
-            f"SELECT * FROM guild WHERE message_id > {self.first_sql_id} ORDER BY message_id;",
-            "sqlite:///" + MAIN_DATABASE_PATH,
-            schema_overrides=self.schema,
-        )
-
         # Find messages sent after SQL Database was last updated
         cursor = await database.connection.execute(
             "SELECT message_timestamp FROM guild ORDER BY message_id DESC LIMIT 1"
@@ -263,18 +239,24 @@ class AuditGuildDTDs:
         )
         await cursor.close()
 
+        # Fetch all messages stored in database
+        sql_df = pl.read_database_uri(
+            f"SELECT * FROM guild WHERE message_timestamp > {aware_date.timestamp()} ORDER BY message_timestamp;",
+            "sqlite:///" + MAIN_DATABASE_PATH,
+            schema_overrides=self.schema,
+        )
+
         await self.filter_guild_messages(message_iterator)
 
-        # TODO: Swap Polars Implementation for SQL, Implement Filtering for SQL
-        stacked_df = sql_df.vstack(self.csv_df)
-        time_column = stacked_df.select(
+        # TODO: Implement Filtering for SQL
+        time_column = sql_df.select(
             pl.from_epoch("message_timestamp", time_unit="s")
             .dt.convert_time_zone("America/New_York")
             .cast(pl.String)
             .replace("T", "")
         ).to_series(0)
-        stacked_df.replace_column(1, time_column)
-        output_string = stacked_df.write_csv()
+        sql_df.replace_column(1, time_column)
+        output_string = sql_df.write_csv()
         output_file = io.StringIO(output_string)
         await ctx.respond(
             attachment=hikari.Bytes(
@@ -283,3 +265,6 @@ class AuditGuildDTDs:
                 "text/csv",
             )
         )
+        end = time.perf_counter()
+        elapsed = end - start
+        print(f"audit_guild_downtime executed in {elapsed:.4f} seconds.")

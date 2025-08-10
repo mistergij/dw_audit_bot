@@ -14,12 +14,13 @@ You should have received a copy of the GNU General Public License along with Ken
 <https://www.gnu.org/licenses/>.
 """
 
-import datetime
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 
-def to_int(value: str) -> int:
+def to_int(value: str) -> str | int:
+    if not value:
+        return value
     return int(value)
 
 
@@ -52,3 +53,7 @@ def convert_epoch(epoch: float) -> datetime:
       A time-aware datetime object representing the corresponding UNIX epoch time.
     """
     return datetime.fromtimestamp(epoch).replace(tzinfo=ZoneInfo("America/New_York"))
+
+
+def convert_single_quote_sql(text: str) -> str:
+    return str.replace(text, "'", "''").rstrip()

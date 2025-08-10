@@ -75,7 +75,28 @@ GUILD_DTD_DICT = {
     15,
     "healer",
     16,
+    "assasinate",
+    17,
 }
+GUILD_DTD_CHOICES = [
+    ("alchem", "alchem"),
+    ("arcana", "arcana"),
+    ("armam", "armam"),
+    ("assassinate", "assassinate"),
+    ("crime", "crime"),
+    ("cult", "cult"),
+    ("explore", "explore"),
+    ("farm", "farm"),
+    ("med", "med"),
+    ("merc", "merc"),
+    ("merchant", "merchant"),
+    ("patrol", "patrol"),
+    ("research", "research"),
+    ("scribe", "scribe"),
+    ("showtime", "showtime"),
+    ("works", "works"),
+    ("healer", "healer"),
+]
 MONTH_CHOICES = [
     ("January", "01"),
     ("February", "02"),
@@ -105,3 +126,8 @@ DAY_DICTIONARY = {
     "11": 30,
     "12": 31,
 }
+
+CHANNEL_CHOICES = [
+    ("dtd-automated-log", "579777361117970465"),
+    ("lifestyle-log", "586471153141284866"),
+]

@@ -30,7 +30,6 @@ from bot.constants import (
     database,
     Plugin,
     GUILD_DTD_CHOICES,
-    GUILD_DTD_DICT,
     GUILD_ID,
     MAIN_DATABASE_PATH,
     MONTH_CHOICES,

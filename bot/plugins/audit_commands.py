@@ -149,8 +149,10 @@ class AuditDTDs:
                     dtd_type = re2.match(r"\w+", embed.footer.text[7:])[0].replace("assasinate", "assassinate")
                 elif "!business" in embed.footer.text:
                     to_audit = "business"
-                    print(description)
                     dtd_type = re2.search(r"Business Category:?\*\*:? ([^\n\r]+)", description)[1]
+                elif "!ptw" in embed.footer.text:
+                    to_audit = "ptw"
+                    dtd_type = "N/A"
                 else:
                     continue
 
@@ -214,9 +216,13 @@ class AuditDTDs:
 
         return return_string
 
+    def create_union(self, table_name: str, aware_date: datetime):
+        return f"SELECT * FROM {table_name} WHERE message_timestamp > {aware_date.timestamp()} AND message_id IN (SELECT message_id FROM search_{table_name}{self.create_query()})"
+
     async def filter_tables(self, aware_date: datetime) -> pl.DataFrame:
+        print(f"{self.create_union('guild', aware_date)} UNION {self.create_union('business', aware_date)} UNION {self.create_union('ptw', aware_date)}")
         return pl.read_database_uri(
-            f"SELECT * FROM guild WHERE message_timestamp > {aware_date.timestamp()} AND message_id IN (SELECT message_id FROM search_guild{self.create_query()}) UNION SELECT * FROM business WHERE message_timestamp > {aware_date.timestamp()} AND message_id IN (SELECT message_id FROM search_business{self.create_query()})",
+            f"{self.create_union('guild', aware_date)} UNION {self.create_union('business', aware_date)} UNION {self.create_union('ptw', aware_date)}",
             "sqlite:///" + MAIN_DATABASE_PATH,
             schema_overrides=self.schema,
         )
@@ -237,6 +243,9 @@ class AuditDTDs:
         await database.connection.execute(
             "CREATE VIRTUAL TABLE IF NOT EXISTS search_business USING FTS5(message_id, dtd_type, user_id, char_name);"
         )
+        await database.connection.execute(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS search_ptw USING FTS5(message_id, dtd_type, user_id, char_name);"
+        )
 
         # Find messages not yet in database
         await self.update_tables(message_iterator, True)
@@ -249,7 +258,7 @@ class AuditDTDs:
 
         # Create cursor to find most recent timestamp in database
         cursor = await database.connection.execute(
-            "SELECT message_timestamp FROM (SELECT message_timestamp FROM guild UNION SELECT message_timestamp FROM business) ORDER BY message_timestamp DESC LIMIT 1"
+            "SELECT message_timestamp FROM (SELECT message_timestamp FROM guild UNION SELECT message_timestamp FROM business UNION SELECT message_timestamp from ptw) ORDER BY message_timestamp DESC LIMIT 1"
         )
         latest_sql_timestamp = await cursor.fetchone()
 

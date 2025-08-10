@@ -20,8 +20,7 @@ import os
 import crescent
 import hikari
 
-from bot.audit_model import AuditModel
-from bot.utils import DISCORD_TOKEN
+from bot.constants import DISCORD_TOKEN
 
 if os.name != "nt":
     import uvloop
@@ -30,10 +29,10 @@ if os.name != "nt":
 
 audit_bot = hikari.GatewayBot(DISCORD_TOKEN)  # pyright: ignore
 
-audit_model = AuditModel()
 
-client = crescent.Client(audit_bot, audit_model)
+client = crescent.Client(audit_bot)
 client.plugins.load_folder("bot.plugins")
+
 
 def main():
     audit_bot.run()

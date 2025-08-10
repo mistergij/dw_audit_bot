@@ -1,4 +1,4 @@
-"""Define utility functions and constants for the bot.
+"""Defines a database class for variable storage.
 Copyright © 2025 Dnd World
 
 This file is part of Kensa.
@@ -14,22 +14,14 @@ You should have received a copy of the GNU General Public License along with Ken
 <https://www.gnu.org/licenses/>.
 """
 
-import os
+from dataclasses import dataclass
 
-import crescent
-import hikari
-from dotenv import find_dotenv, load_dotenv
+import aiosqlite
 
-from bot.audit_model import AuditModel
 
-load_dotenv(find_dotenv(usecwd=True))
+@dataclass
+class Database:
+    """Class to keep track of Kensa's SQLite databases"""
 
-Plugin = crescent.Plugin[hikari.GatewayBot, AuditModel]
-
-DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
-if DISCORD_TOKEN is None:
-    raise ValueError("DISCORD_TOKEN environment variable is not set.")
-
-AVRAE_ID = os.environ.get("AVRAE_ID")
-if AVRAE_ID is None:
-    raise ValueError("AVRAE_ID environment variable is not set.")
+    connection: aiosqlite.Connection = None
+    earliest_audit: float = None

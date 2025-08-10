@@ -9,3 +9,10 @@ result
 .ruff_cache
 .ropeproject
 dw_audit_bot.egg-info/
+
+# SQLite
+/bot/resources/*.sqlite
+/bot/resources/*.sqlite-journal
+
+# Storage
+/bot/resources/earliest_audit.txt

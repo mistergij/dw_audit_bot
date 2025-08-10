@@ -20,6 +20,8 @@ import crescent
 import hikari
 from dotenv import find_dotenv, load_dotenv
 
+from bot.database import Database
+
 
 load_dotenv(find_dotenv(usecwd=True))
 
@@ -131,3 +133,5 @@ CHANNEL_CHOICES = [
     ("dtd-automated-log", "579777361117970465"),
     ("lifestyle-log", "586471153141284866"),
 ]
+
+database = Database()

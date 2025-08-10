@@ -73,7 +73,7 @@ class GetMessage:
             await ctx.respond(
                 f"**Title:** `{embed.title}`\n"
                 f"**Description:** ```{embed.description}```\n"
-                f"**Fields:** {''.join([f'\nField {i}: \n```{value}```' for i, value in enumerate(embed.fields)])}\n"
+                f"**Fields:** {''.join([f'\nField {i}: \n```{value.name}\n{value.value}```' for i, value in enumerate(embed.fields)])}\n"
                 f"**Footer:** `{embed.footer}`\n"
             )
 
@@ -81,8 +81,8 @@ class GetMessage:
 @plugin.include
 @audit_commands.child
 @crescent.command(
-    name="guild",
-    description="Intelligently fetch and store data from !guild DTDs",
+    name="full",
+    description="Intelligently fetch and store data from DTDs",
 )
 class AuditDTDs:
     def __init__(self):
@@ -137,14 +137,22 @@ class AuditDTDs:
                     break
 
                 embed = message.embeds[0]
-                if embed.footer.text is None or "!guild" not in embed.footer.text:
-                    continue
-
                 description = embed.description
-                footer = embed.footer.text[7:]
-                dtd_type = re2.match(r"\w+", footer)[0].replace("assasinate", "assassinate")
+                if (description is None) or ("Insufficient downtime" in description):
+                    continue
+                for field in embed.fields:
+                    description += f"\n{field.name}\n{field.value}"
 
-                if dtd_type not in GUILD_DTD_DICT or "Insufficient downtime" in description:
+                if embed.footer.text is None:
+                    continue
+                if "!guild" in embed.footer.text:
+                    to_audit = "guild"
+                    dtd_type = re2.match(r"\w+", embed.footer.text[7:])[0].replace("assasinate", "assassinate")
+                elif "!business" in embed.footer.text:
+                    to_audit = "business"
+                    print(description)
+                    dtd_type = re2.search(r"Business Category:?\*\*:? ([^\n\r]+)", description)[1]
+                else:
                     continue
 
                 message_id = message.id
@@ -158,7 +166,7 @@ class AuditDTDs:
                 char_name = re2.search(r"Character:?\*\*:? ([^\n]+)", description)
 
                 try:
-                    await database.connection.execute(f"""INSERT INTO guild VALUES (
+                    await database.connection.execute(f"""INSERT INTO {to_audit} VALUES (
                                                       {message_id},
                                                       {message_timestamp.timestamp()},
                                                       {dtd_remaining},
@@ -172,7 +180,7 @@ class AuditDTDs:
                                                       '{cvt.convert_single_quote_sql(re2.sub(r"\s\(\d+\)", "", char_name[1]))}'
                                                       );""")
                     await database.connection.execute(
-                        f"""INSERT INTO search_guild VALUES(
+                        f"""INSERT INTO search_{to_audit} VALUES(
                         {message_id},
                         '{dtd_type}',
                         {0 if user_id_and_name is None else user_id_and_name[1]},
@@ -209,7 +217,7 @@ class AuditDTDs:
 
     async def filter_tables(self, aware_date: datetime) -> pl.DataFrame:
         return pl.read_database_uri(
-            f"SELECT * FROM guild WHERE message_timestamp > {aware_date.timestamp()} AND message_id IN (SELECT message_ID FROM search_guild{self.create_query()}) ORDER BY message_timestamp",
+            f"SELECT * FROM guild WHERE message_timestamp > {aware_date.timestamp()} AND message_id IN (SELECT message_id FROM search_guild{self.create_query()}) UNION SELECT * FROM business WHERE message_timestamp > {aware_date.timestamp()} AND message_id IN (SELECT message_id FROM search_business{self.create_query()})",
             "sqlite:///" + MAIN_DATABASE_PATH,
             schema_overrides=self.schema,
         )
@@ -227,6 +235,9 @@ class AuditDTDs:
         await database.connection.execute(
             "CREATE VIRTUAL TABLE IF NOT EXISTS search_guild USING FTS5(message_id, dtd_type, user_id, char_name);"
         )
+        await database.connection.execute(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS search_business USING FTS5(message_id, dtd_type, user_id, char_name);"
+        )
 
         # Find messages not yet in database
         await self.update_tables(message_iterator, True)
@@ -239,7 +250,7 @@ class AuditDTDs:
 
         # Create cursor to find most recent timestamp in database
         cursor = await database.connection.execute(
-            "SELECT message_timestamp FROM guild ORDER BY message_id DESC LIMIT 1"
+            "SELECT message_timestamp FROM (SELECT message_timestamp FROM guild UNION SELECT message_timestamp FROM business) ORDER BY message_timestamp DESC LIMIT 1"
         )
         latest_sql_timestamp = await cursor.fetchone()
 

@@ -94,4 +94,3 @@ class QueryDatabase:
             async with c.execute(self.query) as cursor:
                 result = await cursor.fetchall()
         await ctx.respond(result)
-

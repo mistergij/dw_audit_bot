@@ -16,14 +16,17 @@ You should have received a copy of the GNU General Public License along with Ken
 
 import aiosqlite
 import crescent
+from sqlalchemy.ext.asyncio import create_async_engine
 import hikari
 
 from bot.constants import (
     database,
+    DEV_IDS,
     Plugin,
     EARLIEST_AUDIT_PATH,
     MAIN_DATABASE_PATH,
 )
+from bot.errors import InsufficientPrivilegesError
 
 plugin = Plugin()
 database_commands = crescent.Group("database")
@@ -31,18 +34,27 @@ database_commands = crescent.Group("database")
 
 @plugin.include
 @crescent.event
-async def get_connection(event: hikari.StartingEvent) -> None:
+async def start_database(event: hikari.StartingEvent) -> None:
     database.connection = await aiosqlite.connect(MAIN_DATABASE_PATH)
+    database.engine = create_async_engine(f"sqlite+aiosqlite:///{MAIN_DATABASE_PATH}")
     with open(EARLIEST_AUDIT_PATH, "r") as file:
         try:
             database.earliest_audit = float(file.read())
         except ValueError:
             pass
+    await database.connection.executescript(
+        f"""BEGIN;
+            DROP VIEW IF EXISTS raw_all;
+            CREATE VIEW raw_all AS SELECT * FROM guild UNION SELECT * FROM business UNION SELECT * FROM ptw UNION SELECT * FROM hrw;
+            CREATE VIRTUAL TABLE IF NOT EXISTS filtered_all USING FTS5(message_id, dtd_type, user_id, char_name, content=raw_all, content_rowid=message_id);
+            COMMIT;"""
+    )
 
 
 @plugin.include
 @crescent.event
-async def close_connection(event: hikari.StoppingEvent) -> None:
+async def close_database(event: hikari.StoppingEvent) -> None:
+    await database.connection.commit()
     await database.connection.close()
     with open(EARLIEST_AUDIT_PATH, "w") as file:
         file.write(str(database.earliest_audit))
@@ -50,10 +62,13 @@ async def close_connection(event: hikari.StoppingEvent) -> None:
 
 @plugin.include
 @database_commands.child
-@crescent.command(description="Creates the guild DTD database and corresponding tables")
-async def create_guild_database(ctx: crescent.Context) -> None:
+@crescent.command(description="Creates a DTD table with the given name")
+async def create_database(ctx: crescent.Context, table_name: str) -> None:
+    if ctx.user.mention not in DEV_IDS:
+        raise InsufficientPrivilegesError("Insufficient Permissions!")
+
     await database.connection.execute(
-        """CREATE TABLE IF NOT EXISTS guild(
+        """CREATE TABLE IF NOT EXISTS %s(
                 message_id INTEGER,
                 message_timestamp REAL,
                 remaining_dtd INTEGER,
@@ -67,6 +82,7 @@ async def create_guild_database(ctx: crescent.Context) -> None:
                 char_name TEXT,
                 PRIMARY KEY(message_id DESC)
         );"""
+        % f"'{table_name.replace("'", "''")}'"
     )
     await ctx.respond("Database created.")
 
@@ -76,6 +92,8 @@ async def create_guild_database(ctx: crescent.Context) -> None:
 @database_commands.child
 @crescent.command(description="Resets latest audit information")
 async def reset_latest_audit_info(ctx: crescent.Context) -> None:
+    if ctx.user.mention not in DEV_IDS:
+        raise InsufficientPrivilegesError("Insufficient Permissions!")
     database.earliest_audit = None
     await ctx.respond("Reset Earliest Audit Info!")
 
@@ -90,6 +108,8 @@ class QueryDatabase:
     query = crescent.option(str, "The query to pass to the table")
 
     async def callback(self, ctx: crescent.Context) -> None:
+        if ctx.user.mention not in DEV_IDS:
+            raise InsufficientPrivilegesError("Insufficient Permissions!")
         async with aiosqlite.connect(MAIN_DATABASE_PATH) as c:
             async with c.execute(self.query) as cursor:
                 result = await cursor.fetchall()

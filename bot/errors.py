@@ -36,7 +36,24 @@ class InsufficientPrivilegesError(Exception):
         return self.message
 
 
+class ParsingError(Exception):
+    """Exception raised when Kensa cannot parse a message"""
+
+    def __init__(self, guild_id, channel_id, message_id):
+        self.message = f"https://discord.com/channels/{guild_id}/{channel_id}/{message_id}"
+        super().__init__(self.message)
+
+    @override
+    def __str__(self):
+        return self.message
+
+
 @plugin.include
 @crescent.catch_command(InsufficientPrivilegesError)
 async def catch_permission_error(exc: InsufficientPrivilegesError, ctx: crescent.Context) -> None:
     await ctx.respond(exc)
+
+@plugin.include
+@crescent.catch_command(ParsingError)
+async def catch_parsing_error(exc: ParsingError, ctx: crescent.Context) -> None:
+    await ctx.respond(f"Unexpected error! Please provide the following link to <@657638997941813258>:\n{exc}")

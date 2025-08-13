@@ -60,6 +60,9 @@ async def start_database(event: hikari.StartingEvent) -> None:
                 CREATE TRIGGER IF NOT EXISTS filtered_all_ai_hrw AFTER INSERT ON hrw BEGIN 
                     INSERT INTO filtered_all(rowid, dtd_type, user_id, char_name) VALUES (new.message_id, new.dtd_type, new.user_id, new.char_name);
                 END;
+                CREATE TRIGGER IF NOT EXISTS filtered_all_ai_odd AFTER INSERT ON odd BEGIN 
+                    INSERT INTO filtered_all(rowid, dtd_type, user_id, char_name) VALUES (new.message_id, new.dtd_type, new.user_id, new.char_name);
+                END;
                 CREATE TRIGGER IF NOT EXISTS filtered_all_ad_guild AFTER DELETE ON guild BEGIN 
                     INSERT INTO filtered_all(filtered_all, rowid, dtd_type, user_id, char_name) VALUES ('delete', old.message_id, old.dtd_type, old.user_id, old.char_name);
                 END;
@@ -70,6 +73,9 @@ async def start_database(event: hikari.StartingEvent) -> None:
                     INSERT INTO filtered_all(filtered_all, rowid, dtd_type, user_id, char_name) VALUES ('delete', old.message_id, old.dtd_type, old.user_id, old.char_name);
                 END;
                 CREATE TRIGGER IF NOT EXISTS filtered_all_ad_hrw AFTER DELETE ON hrw BEGIN 
+                    INSERT INTO filtered_all(filtered_all, rowid, dtd_type, user_id, char_name) VALUES ('delete', old.message_id, old.dtd_type, old.user_id, old.char_name);
+                END;
+                CREATE TRIGGER IF NOT EXISTS filtered_all_ad_odd AFTER DELETE ON odd BEGIN 
                     INSERT INTO filtered_all(filtered_all, rowid, dtd_type, user_id, char_name) VALUES ('delete', old.message_id, old.dtd_type, old.user_id, old.char_name);
                 END;
             COMMIT;"""

@@ -158,6 +158,9 @@ class AuditDTDs:
                 elif "!ptw" in footer:
                     to_audit = "ptw"
                     dtd_type = "N/A"
+                elif "!odd" in footer:
+                    to_audit = "odd"
+                    dtd_type = re2.match(r"\w+", footer[5:])[0]
                 else:
                     continue
 
@@ -204,6 +207,8 @@ class AuditDTDs:
         filtered_options_list = list(filter(None, map(str.strip, [self.dtd_type, str(self.user_id), self.char_name])))
         num_options = len(filtered_options_list)
         match num_options:
+            case 0:
+                query = "SELECT raw_all.* from raw_all INNER JOIN filtered_all ON raw_all.message_id = filtered_all.rowid WHERE raw_all.message_timestamp > :timestamp"
             case 1:
                 query = "SELECT raw_all.* from raw_all INNER JOIN filtered_all ON raw_all.message_id = filtered_all.rowid WHERE filtered_all MATCH :search_1 AND raw_all.message_timestamp > :timestamp"
             case 2:
@@ -219,7 +224,7 @@ class AuditDTDs:
             execute_options={
                 "parameters": {
                     "timestamp": aware_date.timestamp(),
-                    "search_1": filtered_options_list[0],
+                    "search_1": filtered_options_list[0] if num_options > 0 else None,
                     "search_2": filtered_options_list[1] if num_options > 1 else None,
                     "search_3": filtered_options_list[2] if num_options > 2 else None,
                 }

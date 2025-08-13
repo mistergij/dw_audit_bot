@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License along with Ken
 
 import aiosqlite
 import crescent
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import create_engine
 import hikari
 
 from bot.constants import (
@@ -36,17 +36,42 @@ database_commands = crescent.Group("database")
 @crescent.event
 async def start_database(event: hikari.StartingEvent) -> None:
     database.connection = await aiosqlite.connect(MAIN_DATABASE_PATH)
-    database.engine = create_async_engine(f"sqlite+aiosqlite:///{MAIN_DATABASE_PATH}")
+    database.engine = create_engine(f"sqlite:///{MAIN_DATABASE_PATH}")
     with open(EARLIEST_AUDIT_PATH, "r") as file:
         try:
             database.earliest_audit = float(file.read())
         except ValueError:
             pass
     await database.connection.executescript(
-        f"""BEGIN;
-            DROP VIEW IF EXISTS raw_all;
-            CREATE VIEW raw_all AS SELECT * FROM guild UNION SELECT * FROM business UNION SELECT * FROM ptw UNION SELECT * FROM hrw;
-            CREATE VIRTUAL TABLE IF NOT EXISTS filtered_all USING FTS5(message_id, dtd_type, user_id, char_name, content=raw_all, content_rowid=message_id);
+        """BEGIN;
+                DROP VIEW IF EXISTS raw_all;
+                CREATE VIEW raw_all AS SELECT * FROM guild UNION SELECT * FROM business UNION SELECT * FROM ptw UNION SELECT * FROM hrw;
+                CREATE VIRTUAL TABLE IF NOT EXISTS filtered_all USING FTS5(message_id, dtd_type, user_id, char_name, content=raw_all, content_rowid=message_id);
+                INSERT INTO filtered_all(filtered_all) VALUES('rebuild');
+                CREATE TRIGGER IF NOT EXISTS filtered_all_ai_guild AFTER INSERT ON guild BEGIN 
+                    INSERT INTO filtered_all(rowid, dtd_type, user_id, char_name) VALUES (new.message_id, new.dtd_type, new.user_id, new.char_name);
+                END;
+                CREATE TRIGGER IF NOT EXISTS filtered_all_ai_business AFTER INSERT ON business BEGIN 
+                    INSERT INTO filtered_all(rowid, dtd_type, user_id, char_name) VALUES (new.message_id, new.dtd_type, new.user_id, new.char_name);
+                END;
+                CREATE TRIGGER IF NOT EXISTS filtered_all_ai_ptw AFTER INSERT ON ptw BEGIN 
+                    INSERT INTO filtered_all(rowid, dtd_type, user_id, char_name) VALUES (new.message_id, new.dtd_type, new.user_id, new.char_name);
+                END;
+                CREATE TRIGGER IF NOT EXISTS filtered_all_ai_hrw AFTER INSERT ON hrw BEGIN 
+                    INSERT INTO filtered_all(rowid, dtd_type, user_id, char_name) VALUES (new.message_id, new.dtd_type, new.user_id, new.char_name);
+                END;
+                CREATE TRIGGER IF NOT EXISTS filtered_all_ad_guild AFTER DELETE ON guild BEGIN 
+                    INSERT INTO filtered_all(filtered_all, rowid, dtd_type, user_id, char_name) VALUES ('delete', old.message_id, old.dtd_type, old.user_id, old.char_name);
+                END;
+                CREATE TRIGGER IF NOT EXISTS filtered_all_ad_business AFTER DELETE ON business BEGIN 
+                    INSERT INTO filtered_all(filtered_all, rowid, dtd_type, user_id, char_name) VALUES ('delete', old.message_id, old.dtd_type, old.user_id, old.char_name);
+                END;
+                CREATE TRIGGER IF NOT EXISTS filtered_all_ad_ptw AFTER DELETE ON ptw BEGIN 
+                    INSERT INTO filtered_all(filtered_all, rowid, dtd_type, user_id, char_name) VALUES ('delete', old.message_id, old.dtd_type, old.user_id, old.char_name);
+                END;
+                CREATE TRIGGER IF NOT EXISTS filtered_all_ad_hrw AFTER DELETE ON hrw BEGIN 
+                    INSERT INTO filtered_all(filtered_all, rowid, dtd_type, user_id, char_name) VALUES ('delete', old.message_id, old.dtd_type, old.user_id, old.char_name);
+                END;
             COMMIT;"""
     )
 
@@ -114,3 +139,9 @@ class QueryDatabase:
             async with c.execute(self.query) as cursor:
                 result = await cursor.fetchall()
         await ctx.respond(result)
+
+
+@plugin.include
+@crescent.catch_command(InsufficientPrivilegesError)
+async def catch_permission_error(exc: InsufficientPrivilegesError, ctx: crescent.Context) -> None:
+    await ctx.respond(exc)

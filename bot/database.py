@@ -17,7 +17,7 @@ You should have received a copy of the GNU General Public License along with Ken
 from dataclasses import dataclass
 
 import aiosqlite
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy import Engine
 
 
 @dataclass
@@ -26,4 +26,4 @@ class Database:
 
     connection: aiosqlite.Connection = None
     earliest_audit: float = None
-    engine: AsyncEngine = None
+    engine: Engine = None

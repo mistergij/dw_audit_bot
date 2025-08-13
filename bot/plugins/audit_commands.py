@@ -21,6 +21,7 @@ from datetime import datetime
 import aiosqlite
 import crescent
 import hikari
+import numpy as np
 import polars as pl
 import re2
 import sys
@@ -34,6 +35,7 @@ from bot.constants import (
     MAIN_DATABASE_PATH,
     MONTH_CHOICES,
 )
+from bot.errors import ArgumentError, ParsingError
 import bot.converters as cvt
 
 plugin = Plugin()
@@ -112,9 +114,7 @@ class AuditDTDs:
     ).convert(cvt.to_int)
     month = crescent.option(str, description="The month after which to audit.", choices=MONTH_CHOICES)
     day = crescent.option(int, description="The day after which to audit.").convert(cvt.convert_day)
-    char_name = crescent.option(str, description="(Optional) The name of the character to audit.", default="").convert(
-        cvt.convert_single_quote_sql
-    )
+    char_name = crescent.option(str, description="(Optional) The name of the character to audit.", default="")
     user_id = crescent.option(str, description="(Optional) The ID of the User to audit.", default="").convert(
         cvt.to_int
     )
@@ -142,15 +142,22 @@ class AuditDTDs:
                 for field in embed.fields:
                     description += f"\n{field.name}\n{field.value}"
 
-                if embed.footer.text is None:
+                footer = embed.footer.text
+
+                if embed.title is None:
                     continue
-                if "!guild" in embed.footer.text:
+                elif "High-Risk Work" in embed.title:
+                    to_audit = "hrw"
+                    dtd_type = "N/A"
+                elif footer is None:
+                    continue
+                elif "!guild" in footer:
                     to_audit = "guild"
-                    dtd_type = re2.match(r"\w+", embed.footer.text[7:])[0].replace("assasinate", "assassinate")
-                elif "!business" in embed.footer.text:
+                    dtd_type = re2.match(r"\w+", footer[7:])[0].replace("assasinate", "assassinate")
+                elif "!business" in footer:
                     to_audit = "business"
                     dtd_type = re2.search(r"Business Category:?\*\*:? ([^\n\r]+)", description)[1]
-                elif "!ptw" in embed.footer.text:
+                elif "!ptw" in footer:
                     to_audit = "ptw"
                     dtd_type = "N/A"
                 else:
@@ -167,64 +174,54 @@ class AuditDTDs:
                 char_name = re2.search(r"Character:?\*\*:? ([^\n]+)", description)
 
                 try:
-                    await database.connection.execute(f"""INSERT INTO {to_audit} VALUES (
-                                                      {message_id},
-                                                      {message_timestamp.timestamp()},
-                                                      {dtd_remaining},
-                                                      {0 if old_purse is None else float(old_purse[1])},
-                                                      {0 if new_purse is None else float(new_purse[1])},
-                                                      '{"Unknown" if lifestyle is None else lifestyle[1]}',
-                                                      '{"None" if injuries is None else injuries[1]}',
-                                                      '{dtd_type}',
-                                                      {0 if user_id_and_name is None else user_id_and_name[1]},
-                                                      '{"Unknown" if user_id_and_name is None else cvt.convert_single_quote_sql(user_id_and_name[2])}',
-                                                      '{cvt.convert_single_quote_sql(re2.sub(r"\s\(\d+\)", "", char_name[1]))}'
-                                                      );""")
                     await database.connection.execute(
-                        f"""INSERT INTO search_{to_audit} VALUES(
-                        {message_id},
-                        '{dtd_type}',
-                        {0 if user_id_and_name is None else user_id_and_name[1]},
-                        '{cvt.convert_single_quote_sql(char_name[1])}'
-                        );"""
+                        f"INSERT INTO {to_audit} VALUES (?,?,?,?,?,?,?,?,?,?,?);",
+                        (
+                            message_id,
+                            message_timestamp.timestamp(),
+                            dtd_remaining,
+                            0 if old_purse is None else float(old_purse[1]),
+                            0 if new_purse is None else float(new_purse[1]),
+                            "Unknown" if lifestyle is None else lifestyle[1],
+                            "None" if injuries is None else injuries[1],
+                            dtd_type,
+                            0 if user_id_and_name is None else user_id_and_name[1],
+                            "Unknown" if user_id_and_name is None else user_id_and_name[2],
+                            re2.sub(r"\s\(\d+\)", "", char_name[1]),
+                        ),
                     )
                     await database.connection.commit()
                 except aiosqlite.IntegrityError:
                     continue
                 except TypeError:
-                    print(
-                        f"Unexpected Error! Message Link: https://discord.com/channels/{GUILD_ID}/{self.channel_id}/{message.id}"
-                    )
+                    raise ParsingError
 
             # Handles if message does not have an Embed or if Embed doesn't have a Footer
             except (IndexError, AttributeError):
                 pass
-
-    def create_query(self) -> str:
-        options = [self.char_name, self.user_id, self.dtd_type]
-        not_options = [not option for option in options]
-        option_names = ["char_name", "user_id", "dtd_type"]
-        prior_query = False
-        return_string = ""
-        for idx, option in enumerate(options):
-            if not option:
-                continue
-            if not prior_query:
-                return_string += f" WHERE {option_names[idx]} MATCH '\"{option_names[idx]}\" : {option}'"
-            if ((idx == 0) and (not not_options[1] or not not_options[2])) or ((idx == 1) and not not_options[2]):
-                return_string += " AND "
-
-        return return_string
-
-    def create_union(self, table_name: str, aware_date: datetime):
-        return f"SELECT * FROM {table_name} WHERE message_timestamp > {aware_date.timestamp()} AND message_id IN (SELECT message_id FROM search_{table_name}{self.create_query()})"
+            except TypeError:
+                raise ParsingError
 
     async def filter_tables(self, aware_date: datetime) -> pl.DataFrame:
-        print(f"{self.create_union('guild', aware_date)} UNION {self.create_union('business', aware_date)} UNION {self.create_union('ptw', aware_date)}")
-        return pl.read_database_uri(
-            f"{self.create_union('guild', aware_date)} UNION {self.create_union('business', aware_date)} UNION {self.create_union('ptw', aware_date)}",
-            "sqlite:///" + MAIN_DATABASE_PATH,
-            schema_overrides=self.schema,
+        options_list = list(filter(None, map(str.strip, [self.dtd_type, str(self.user_id), self.char_name])))
+        num_options = len(options_list)
+        if num_options > 1:
+            raise ArgumentError(options_list)
+        try:
+            search_str = options_list[0]
+        except IndexError:
+            raise ArgumentError(options_list)
+
+        print(search_str)
+        return pl.read_database(
+            "SELECT raw_all.* from raw_all INNER JOIN filtered_all ON raw_all.message_id = filtered_all.rowid WHERE filtered_all MATCH :search AND raw_all.message_timestamp > :timestamp",
+            database.engine,
+            execute_options={
+                "parameters": {
+                    "search": search_str,
+                    "timestamp": aware_date.timestamp()
+                }
+            },
         )
 
     async def callback(self, ctx: crescent.Context) -> None:
@@ -234,17 +231,6 @@ class AuditDTDs:
 
         message_iterator: hikari.LazyIterator[hikari.Message] = plugin.app.rest.fetch_messages(
             self.channel_id, after=aware_date
-        )
-
-        # Create virtual table for searching
-        await database.connection.execute(
-            "CREATE VIRTUAL TABLE IF NOT EXISTS search_guild USING FTS5(message_id, dtd_type, user_id, char_name);"
-        )
-        await database.connection.execute(
-            "CREATE VIRTUAL TABLE IF NOT EXISTS search_business USING FTS5(message_id, dtd_type, user_id, char_name);"
-        )
-        await database.connection.execute(
-            "CREATE VIRTUAL TABLE IF NOT EXISTS search_ptw USING FTS5(message_id, dtd_type, user_id, char_name);"
         )
 
         # Find messages not yet in database
@@ -258,7 +244,7 @@ class AuditDTDs:
 
         # Create cursor to find most recent timestamp in database
         cursor = await database.connection.execute(
-            "SELECT message_timestamp FROM (SELECT message_timestamp FROM guild UNION SELECT message_timestamp FROM business UNION SELECT message_timestamp from ptw) ORDER BY message_timestamp DESC LIMIT 1"
+            "SELECT message_timestamp FROM raw_all ORDER BY message_timestamp DESC LIMIT 1"
         )
         latest_sql_timestamp = await cursor.fetchone()
 
@@ -294,3 +280,15 @@ class AuditDTDs:
         end = time.perf_counter()
         elapsed = end - start
         print(f"/audit guild executed in {elapsed:.4f} seconds.")
+
+
+@plugin.include
+@crescent.catch_command(ArgumentError)
+async def catch_argument_error(exc: ArgumentError, ctx: crescent.Context) -> None:
+    await ctx.respond(exc)
+
+
+@plugin.include
+@crescent.catch_command(ParsingError)
+async def catch_parsing_error(exc: ParsingError, ctx: crescent.Context) -> None:
+    await ctx.respond(f"Unexpected error! Please provide the following link to <@657638997941813258>:\n{exc}")

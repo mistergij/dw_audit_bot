@@ -39,6 +39,11 @@ GUILD_ID = os.environ.get("GUILD_ID")
 if GUILD_ID is None:
     raise ValueError("GUILD_ID environment variable is not set.")
 
+DEV_IDS = os.environ.get("DEV_IDS")
+if DEV_IDS is None:
+    raise ValueError("DEV_IDS environment variable is not set.")
+DEV_IDS = DEV_IDS.split(",")
+
 MAIN_DATABASE_PATH = os.path.join(os.getcwd(), "bot", "resources", "database.sqlite")
 GUILD_DATABASE_PATH = os.path.join(os.getcwd(), "bot", "resources", "guild.sqlite")
 EARLIEST_AUDIT_PATH = os.path.join(os.getcwd(), "bot", "resources", "earliest_audit.txt")

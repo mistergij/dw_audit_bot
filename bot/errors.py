@@ -27,33 +27,34 @@ plugin = Plugin()
 class InsufficientPrivilegesError(Exception):
     """Exception raised when a user has insufficient privileges to run a command"""
 
-    def __init__(self, message):
+    def __init__(self, message: str):
         self.message = message
         super().__init__(self.message)
 
     @override
-    def __str__(self):
+    def __str__(self) -> str:
         return self.message
 
 
 class ParsingError(Exception):
     """Exception raised when Kensa cannot parse a message"""
 
-    def __init__(self, guild_id, channel_id, message_id):
+    def __init__(self, guild_id: int, channel_id: int, message_id: int) -> None:
         self.message = f"https://discord.com/channels/{guild_id}/{channel_id}/{message_id}"
         super().__init__(self.message)
 
     @override
-    def __str__(self):
+    def __str__(self) -> str:
         return self.message
 
 
-@plugin.include
-@crescent.catch_command(InsufficientPrivilegesError)
-async def catch_permission_error(exc: InsufficientPrivilegesError, ctx: crescent.Context) -> None:
-    await ctx.respond(exc)
+class ArgumentError(Exception):
+    """Exception raised when Kensa receives too many arguments for a command"""
 
-@plugin.include
-@crescent.catch_command(ParsingError)
-async def catch_parsing_error(exc: ParsingError, ctx: crescent.Context) -> None:
-    await ctx.respond(f"Unexpected error! Please provide the following link to <@657638997941813258>:\n{exc}")
+    def __init__(self, args_list: list[str]) -> None:
+        self.message = f"Issue with arguments provided! Provided Arguments:\n{', '.join(args_list)}"
+        super().__init__()
+
+    @override
+    def __str__(self) -> str:
+        return self.message

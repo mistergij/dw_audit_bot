@@ -161,8 +161,16 @@ class AuditDTDs:
                 elif "!odd" in footer:
                     to_audit = "odd"
                     dtd_type = re2.match(r"\w+", footer[5:])[0]
+                elif "train" in footer:
+                    to_audit = "train"
+                    dtd_type = "N/A"
+                    print("Train found!")
                 else:
                     continue
+                if to_audit != "train":
+                    query = f"INSERT INTO {to_audit} VALUES (:message_id,:timestamp,:dtd_remaining,:old_purse,:new_purse,:lifestyle,:injuries,:dtd_type,:user_id,:user_name,:char_name);"
+                else:
+                    query = f"INSERT INTO {to_audit} VALUES (:message_id,:timestamp,:dtd_remaining,:old_purse,:new_purse,:lifestyle,:injuries,:dtd_type,:user_id,:user_name,:char_name,:xp_gained);"
 
                 message_id = message.id
                 message_timestamp = message.timestamp
@@ -173,23 +181,25 @@ class AuditDTDs:
                 injuries = re2.search(r"Injuries:?\*\*:? ([^\n\r]+)", description)
                 user_id_and_name = re2.search(r"Player:?\*\*:? <@(\d+)> `([^`\n\r]+)", description)
                 char_name = re2.search(r"Character:?\*\*:? ([^\n]+)", description)
+                xp_gained = re2.search(r"XP Gained:?\*\*:? (\d+)", description)
 
                 try:
                     await database.connection.execute(
-                        f"INSERT INTO {to_audit} VALUES (?,?,?,?,?,?,?,?,?,?,?);",
-                        (
-                            message_id,
-                            message_timestamp.timestamp(),
-                            dtd_remaining,
-                            0 if old_purse is None else float(old_purse[1]),
-                            0 if new_purse is None else float(new_purse[1]),
-                            "Unknown" if lifestyle is None else lifestyle[1],
-                            "None" if injuries is None else injuries[1],
-                            dtd_type,
-                            0 if user_id_and_name is None else user_id_and_name[1],
-                            "Unknown" if user_id_and_name is None else user_id_and_name[2],
-                            re2.sub(r"\s\(\d+\)", "", char_name[1]),
-                        ),
+                        query,
+                        {
+                            "message_id": message_id,
+                            "timestamp": message_timestamp.timestamp(),
+                            "dtd_remaining": dtd_remaining,
+                            "old_purse": 0 if old_purse is None else float(old_purse[1]),
+                            "new_purse": 0 if new_purse is None else float(new_purse[1]),
+                            "lifestyle": "Unknown" if lifestyle is None else lifestyle[1],
+                            "injuries": "None" if injuries is None else injuries[1],
+                            "dtd_type": dtd_type,
+                            "user_id": 0 if user_id_and_name is None else user_id_and_name[1],
+                            "user_name": "Unknown" if user_id_and_name is None else user_id_and_name[2],
+                            "char_name": re2.sub(r"\s\(\d+\)", "", char_name[1]),
+                            "xp_gained": None if xp_gained is None else int(xp_gained[1]),
+                        },
                     )
                     await database.connection.commit()
                 except aiosqlite.IntegrityError:
@@ -208,13 +218,13 @@ class AuditDTDs:
         num_options = len(filtered_options_list)
         match num_options:
             case 0:
-                query = "SELECT raw_all.* from raw_all INNER JOIN filtered_all ON raw_all.message_id = filtered_all.rowid WHERE raw_all.message_timestamp > :timestamp"
+                query = "SELECT raw_xp_appended.* from raw_xp_appended INNER JOIN filtered_all ON raw_xp_appended.message_id = filtered_all.rowid WHERE raw_xp_appended.message_timestamp > :timestamp"
             case 1:
-                query = "SELECT raw_all.* from raw_all INNER JOIN filtered_all ON raw_all.message_id = filtered_all.rowid WHERE filtered_all MATCH :search_1 AND raw_all.message_timestamp > :timestamp"
+                query = "SELECT raw_xp_appended.* from raw_xp_appended INNER JOIN filtered_all ON raw_xp_appended.message_id = filtered_all.rowid WHERE filtered_all MATCH :search_1 AND raw_xp_appended.message_timestamp > :timestamp"
             case 2:
-                query = "SELECT raw_all.* from raw_all INNER JOIN filtered_all ON raw_all.message_id = filtered_all.rowid WHERE filtered_all MATCH :search_1 AND filtered_all MATCH :search_2 AND raw_all.message_timestamp > :timestamp"
+                query = "SELECT raw_xp_appended.* from raw_xp_appended INNER JOIN filtered_all ON raw_xp_appended.message_id = filtered_all.rowid WHERE filtered_all MATCH :search_1 AND filtered_all MATCH :search_2 AND raw_xp_appended.message_timestamp > :timestamp"
             case 3:
-                query = "SELECT raw_all.* from raw_all INNER JOIN filtered_all ON raw_all.message_id = filtered_all.rowid WHERE filtered_all MATCH :search_1 AND filtered_all MATCH :search_2 AND filtered_all MATCH :search_3 AND raw_all.message_timestamp > :timestamp"
+                query = "SELECT raw_xp_appended.* from raw_xp_appended INNER JOIN filtered_all ON raw_xp_appended.message_id = filtered_all.rowid WHERE filtered_all MATCH :search_1 AND filtered_all MATCH :search_2 AND filtered_all MATCH :search_3 AND raw_xp_appended.message_timestamp > :timestamp"
             case _:
                 raise ArgumentError(filtered_options_list)
 

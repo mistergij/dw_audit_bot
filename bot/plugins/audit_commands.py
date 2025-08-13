@@ -164,7 +164,6 @@ class AuditDTDs:
                 elif "train" in footer:
                     to_audit = "train"
                     dtd_type = "N/A"
-                    print("Train found!")
                 else:
                     continue
                 if to_audit != "train":

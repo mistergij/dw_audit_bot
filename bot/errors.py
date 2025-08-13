@@ -16,13 +16,6 @@ You should have received a copy of the GNU General Public License along with Ken
 
 from typing import override
 
-import crescent
-
-from bot.constants import Plugin
-
-
-plugin = Plugin()
-
 
 class InsufficientPrivilegesError(Exception):
     """Exception raised when a user has insufficient privileges to run a command"""

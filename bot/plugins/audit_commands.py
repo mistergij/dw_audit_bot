@@ -21,7 +21,6 @@ from datetime import datetime
 import aiosqlite
 import crescent
 import hikari
-import numpy as np
 import polars as pl
 import re2
 import sys
@@ -32,7 +31,6 @@ from bot.constants import (
     Plugin,
     GUILD_DTD_CHOICES,
     GUILD_ID,
-    MAIN_DATABASE_PATH,
     MONTH_CHOICES,
 )
 from bot.errors import ArgumentError, ParsingError
@@ -194,43 +192,47 @@ class AuditDTDs:
                 except aiosqlite.IntegrityError:
                     continue
                 except TypeError:
-                    raise ParsingError
+                    raise ParsingError(GUILD_ID, message.channel_id, message.id)
 
             # Handles if message does not have an Embed or if Embed doesn't have a Footer
             except (IndexError, AttributeError):
                 pass
             except TypeError:
-                raise ParsingError
+                raise ParsingError(GUILD_ID, message.channel_id, message.id)
 
     async def filter_tables(self, aware_date: datetime) -> pl.DataFrame:
-        options_list = list(filter(None, map(str.strip, [self.dtd_type, str(self.user_id), self.char_name])))
-        num_options = len(options_list)
-        if num_options > 1:
-            raise ArgumentError(options_list)
-        try:
-            search_str = options_list[0]
-        except IndexError:
-            raise ArgumentError(options_list)
+        filtered_options_list = list(filter(None, map(str.strip, [self.dtd_type, str(self.user_id), self.char_name])))
+        num_options = len(filtered_options_list)
+        match num_options:
+            case 1:
+                query = "SELECT raw_all.* from raw_all INNER JOIN filtered_all ON raw_all.message_id = filtered_all.rowid WHERE filtered_all MATCH :search_1 AND raw_all.message_timestamp > :timestamp"
+            case 2:
+                query = "SELECT raw_all.* from raw_all INNER JOIN filtered_all ON raw_all.message_id = filtered_all.rowid WHERE filtered_all MATCH :search_1 AND filtered_all MATCH :search_2 AND raw_all.message_timestamp > :timestamp"
+            case 3:
+                query = "SELECT raw_all.* from raw_all INNER JOIN filtered_all ON raw_all.message_id = filtered_all.rowid WHERE filtered_all MATCH :search_1 AND filtered_all MATCH :search_2 AND filtered_all MATCH :search_3 AND raw_all.message_timestamp > :timestamp"
+            case _:
+                raise ArgumentError(filtered_options_list)
 
-        print(search_str)
         return pl.read_database(
-            "SELECT raw_all.* from raw_all INNER JOIN filtered_all ON raw_all.message_id = filtered_all.rowid WHERE filtered_all MATCH :search AND raw_all.message_timestamp > :timestamp",
+            query,
             database.engine,
             execute_options={
                 "parameters": {
-                    "search": search_str,
-                    "timestamp": aware_date.timestamp()
+                    "timestamp": aware_date.timestamp(),
+                    "search_1": filtered_options_list[0],
+                    "search_2": filtered_options_list[1] if num_options > 1 else None,
+                    "search_3": filtered_options_list[2] if num_options > 2 else None,
                 }
             },
         )
 
     async def callback(self, ctx: crescent.Context) -> None:
         start = time.perf_counter()
-        await ctx.defer()
+        await ctx.respond("Audit started. This may take a few minutes. Please wait...")
         aware_date = cvt.convert_date(f"{self.year}-{self.month}-{self.day}")
 
         message_iterator: hikari.LazyIterator[hikari.Message] = plugin.app.rest.fetch_messages(
-            self.channel_id, after=aware_date
+            int(self.channel_id), after=aware_date
         )
 
         # Find messages not yet in database
@@ -249,7 +251,7 @@ class AuditDTDs:
         latest_sql_timestamp = await cursor.fetchone()
 
         message_iterator: hikari.LazyIterator[hikari.Message] = plugin.app.rest.fetch_messages(
-            self.channel_id,
+            int(self.channel_id),
             after=cvt.convert_epoch(float(latest_sql_timestamp[0])),
         )
         await cursor.close()

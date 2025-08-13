@@ -87,29 +87,32 @@ async def close_database(event: hikari.StoppingEvent) -> None:
 
 @plugin.include
 @database_commands.child
-@crescent.command(description="Creates a DTD table with the given name")
-async def create_database(ctx: crescent.Context, table_name: str) -> None:
-    if ctx.user.mention not in DEV_IDS:
-        raise InsufficientPrivilegesError("Insufficient Permissions!")
+@crescent.command(description="Creates a DTD table with the given name", name="create_database")
+class CreateDatabase:
+    table_name = crescent.option(str, description="The name of the table to create")
 
-    await database.connection.execute(
-        """CREATE TABLE IF NOT EXISTS %s(
-                message_id INTEGER,
-                message_timestamp REAL,
-                remaining_dtd INTEGER,
-                old_purse REAL,
-                new_purse REAL,
-                lifestyle TEXT,
-                injuries TEXT,
-                dtd_type TEXT,
-                user_id INTEGER,
-                user_name TEXT,
-                char_name TEXT,
-                PRIMARY KEY(message_id DESC)
-        );"""
-        % f"'{table_name.replace("'", "''")}'"
-    )
-    await ctx.respond("Database created.")
+    async def callback(self, ctx: crescent.Context) -> None:
+        if ctx.user.mention not in DEV_IDS:
+            raise InsufficientPrivilegesError("Insufficient Permissions!")
+
+        await database.connection.execute(
+            """CREATE TABLE IF NOT EXISTS %s(
+                    message_id INTEGER,
+                    message_timestamp REAL,
+                    remaining_dtd INTEGER,
+                    old_purse REAL,
+                    new_purse REAL,
+                    lifestyle TEXT,
+                    injuries TEXT,
+                    dtd_type TEXT,
+                    user_id INTEGER,
+                    user_name TEXT,
+                    char_name TEXT,
+                    PRIMARY KEY(message_id DESC)
+            );"""
+            % f"'{self.table_name.replace("'", "''")}'"
+        )
+        await ctx.respond("Database created.")
 
 
 # noinspection PyTypeChecker

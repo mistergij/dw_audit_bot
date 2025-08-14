@@ -14,6 +14,7 @@ You should have received a copy of the GNU General Public License along with Ken
 <https://www.gnu.org/licenses/>.
 """
 
+import logging
 from typing import override
 
 
@@ -32,8 +33,9 @@ class InsufficientPrivilegesError(Exception):
 class ParsingError(Exception):
     """Exception raised when Kensa cannot parse a message"""
 
-    def __init__(self, guild_id: int, channel_id: int, message_id: int) -> None:
+    def __init__(self, parent_error: Exception, guild_id: int, channel_id: int, message_id: int) -> None:
         self.message = f"https://discord.com/channels/{guild_id}/{channel_id}/{message_id}"
+        logging.error(self.message, exc_info=parent_error)
         super().__init__(self.message)
 
     @override

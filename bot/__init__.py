@@ -20,19 +20,49 @@ import os
 import crescent
 import hikari
 
-from bot.constants import DISCORD_TOKEN
+from bot.constants import DISCORD_TOKEN, ERROR_LOG_PATH
 
 if os.name != "nt":
     import uvloop
 
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
-audit_bot = hikari.GatewayBot(DISCORD_TOKEN)  # pyright: ignore
-
+audit_bot = hikari.GatewayBot(
+    DISCORD_TOKEN,
+    logs={
+        "version": 1,
+        "formatters": {"standard": {"format": "%(asctime)s [%(levelname)s] %(name)s %(message)s"}},
+        "handlers": {
+            "default": {
+                "class": "logging.FileHandler",
+                "level": "DEBUG",
+                "formatter": "standard",
+                "filename": ERROR_LOG_PATH,
+                "encoding": "utf-8",
+            },
+            "output": {
+                "class": "logging.StreamHandler",
+                "level": "DEBUG",
+                "stream": "ext://sys.stdout",
+                "formatter": "standard",
+            }
+        },
+        "loggers": {
+            "": {  # root logger
+                "handlers": ["default", "output"],
+                "propagate": False,
+                "level": "DEBUG",
+            }
+        },
+    },
+)
 
 client = crescent.Client(audit_bot)
 client.plugins.load_folder("bot.plugins")
 
 
 def main():
-    audit_bot.run()
+    try:
+        audit_bot.run()
+    finally:
+        print("Bot Stopped Successfully!")

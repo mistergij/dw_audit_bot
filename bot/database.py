@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License along with Ken
 """
 
 from dataclasses import dataclass
+import io
 
 import aiosqlite
 from sqlalchemy import Engine
@@ -27,3 +28,4 @@ class Database:
     connection: aiosqlite.Connection = None
     earliest_audit: float = None
     engine: Engine = None
+    file: io.TextIOBase = None

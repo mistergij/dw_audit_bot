@@ -46,7 +46,7 @@ async def start_database(event: hikari.StartingEvent) -> None:
         """BEGIN;
                 CREATE VIEW IF NOT EXISTS train_no_xp AS SELECT message_id, message_timestamp, remaining_dtd, old_purse, new_purse, lifestyle, injuries, dtd_type, user_id, user_name, char_name FROM train;
                 DROP VIEW IF EXISTS raw_all;
-                CREATE VIEW raw_all AS SELECT * FROM guild UNION SELECT * FROM business UNION SELECT * FROM ptw UNION SELECT * FROM hrw UNION SELECT * FROM odd UNION SELECT * FROM train_no_xp;
+                CREATE VIEW raw_all AS SELECT * FROM guild UNION SELECT * FROM business UNION SELECT * FROM ptw UNION SELECT * FROM hrw UNION SELECT * FROM odd UNION SELECT * FROM train_no_xp UNION SELECT * FROM lifestyle;
                 DROP VIEW IF EXISTS raw_xp_appended;
                 CREATE VIEW raw_xp_appended AS SELECT raw_all.*, ifnull(train.xp_gained, 0) as xp_gained from raw_all left join train USING (message_id);
                 CREATE VIRTUAL TABLE IF NOT EXISTS filtered_all USING FTS5(message_id, dtd_type, user_id, char_name, content=raw_xp_appended, content_rowid=message_id);
@@ -69,6 +69,9 @@ async def start_database(event: hikari.StartingEvent) -> None:
                 CREATE TRIGGER IF NOT EXISTS filtered_all_ai_train AFTER INSERT ON train BEGIN 
                     INSERT INTO filtered_all(rowid, dtd_type, user_id, char_name) VALUES (new.message_id, new.dtd_type, new.user_id, new.char_name);
                 END;
+                CREATE TRIGGER IF NOT EXISTS filtered_all_ai_lifestyle AFTER INSERT ON lifestyle BEGIN 
+                    INSERT INTO filtered_all(rowid, dtd_type, user_id, char_name) VALUES (new.message_id, new.dtd_type, new.user_id, new.char_name);
+                END;
                 CREATE TRIGGER IF NOT EXISTS filtered_all_ad_guild AFTER DELETE ON guild BEGIN 
                     INSERT INTO filtered_all(filtered_all, rowid, dtd_type, user_id, char_name) VALUES ('delete', old.message_id, old.dtd_type, old.user_id, old.char_name);
                 END;
@@ -85,6 +88,9 @@ async def start_database(event: hikari.StartingEvent) -> None:
                     INSERT INTO filtered_all(filtered_all, rowid, dtd_type, user_id, char_name) VALUES ('delete', old.message_id, old.dtd_type, old.user_id, old.char_name);
                 END;
                 CREATE TRIGGER IF NOT EXISTS filtered_all_ad_train AFTER DELETE ON train BEGIN 
+                    INSERT INTO filtered_all(filtered_all, rowid, dtd_type, user_id, char_name) VALUES ('delete', old.message_id, old.dtd_type, old.user_id, old.char_name);
+                END;
+                CREATE TRIGGER IF NOT EXISTS filtered_all_ad_lifestyle AFTER DELETE ON lifestyle BEGIN 
                     INSERT INTO filtered_all(filtered_all, rowid, dtd_type, user_id, char_name) VALUES ('delete', old.message_id, old.dtd_type, old.user_id, old.char_name);
                 END;
             COMMIT;"""

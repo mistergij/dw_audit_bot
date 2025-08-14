@@ -53,7 +53,9 @@ async def ping(ctx: crescent.Context) -> None:
 @crescent.command(name="get_message", description="Performs a new audit of the server's logs.")
 class GetMessage:
     channel_id = crescent.option(
-        str, description="The ID of the message's channel.", choices=[("#dtd-automated-log", "579777361117970465")]
+        str,
+        description="The ID of the message's channel.",
+        choices=[("#dtd-automated-log", "579777361117970465"), ("#lifestyle-log", "586471153141284866")],
     )
     message_id = crescent.option(
         str,
@@ -135,7 +137,15 @@ class AuditDTDs:
 
                 embed = message.embeds[0]
                 description = embed.description
-                if (description is None) or ("Insufficient downtime" in description):
+                if (
+                    (description is None)
+                    or ("Insufficient downtime" in description)
+                    or ("This alias has been updated" in description)
+                    or ("No lifestyle was specified" in description)
+                    or ("is not a valid lifestyle" in description)
+                    or ("is not a lifestyle-modifying background" in description)
+                    or ("You do not have enough coins" in description)
+                ):
                     continue
                 for field in embed.fields:
                     description += f"\n{field.name}\n{field.value}"
@@ -157,12 +167,15 @@ class AuditDTDs:
                     dtd_type = re2.search(r"Business Category:?\*\*:? ([^\n\r]+)", description)[1]
                 elif "!ptw" in footer:
                     to_audit = "ptw"
-                    dtd_type = "N/A"
+                    dtd_type = "Part-Time Work"
                 elif "!odd" in footer:
                     to_audit = "odd"
                     dtd_type = re2.match(r"\w+", footer[5:])[0]
                 elif "train" in footer:
                     to_audit = "train"
+                    dtd_type = "Combat Training"
+                elif "lifestyle" in footer:
+                    to_audit = "lifestyle"
                     dtd_type = "N/A"
                 else:
                     continue
@@ -174,7 +187,7 @@ class AuditDTDs:
                 message_id = message.id
                 message_timestamp = message.timestamp
                 dtd_remaining = description.count("◉")
-                old_purse = re2.search(r"\*\*:? (\d+\.\d+)", description)
+                old_purse = re2.search(r"(\d+\.\d+)gp ->", description)
                 new_purse = re2.search(r"-> (\d+\.\d+)", description)
                 lifestyle = re2.search(r"Lifestyle:?\*\*:? ([^\n\r]+)", description)
                 injuries = re2.search(r"Injuries:?\*\*:? ([^\n\r]+)", description)
@@ -203,14 +216,14 @@ class AuditDTDs:
                     await database.connection.commit()
                 except aiosqlite.IntegrityError:
                     continue
-                except TypeError:
-                    raise ParsingError(GUILD_ID, message.channel_id, message.id)
+                except TypeError as e:
+                    raise ParsingError(e, GUILD_ID, message.channel_id, message.id)
 
             # Handles if message does not have an Embed or if Embed doesn't have a Footer
             except (IndexError, AttributeError):
                 pass
-            except TypeError:
-                raise ParsingError(GUILD_ID, message.channel_id, message.id)
+            except TypeError as e:
+                raise ParsingError(e, GUILD_ID, message.channel_id, message.id)
 
     async def filter_tables(self, aware_date: datetime) -> pl.DataFrame:
         filtered_options_list = list(filter(None, map(str.strip, [self.dtd_type, str(self.user_id), self.char_name])))
@@ -307,4 +320,4 @@ async def catch_argument_error(exc: ArgumentError, ctx: crescent.Context) -> Non
 @plugin.include
 @crescent.catch_command(ParsingError)
 async def catch_parsing_error(exc: ParsingError, ctx: crescent.Context) -> None:
-    await ctx.respond(f"Unexpected error! Please provide the following link to <@657638997941813258>:\n{exc}")
+    await ctx.respond(f"Unexpected error! Please provide the following information to <@657638997941813258>:\n{exc}")

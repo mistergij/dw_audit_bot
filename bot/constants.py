@@ -14,6 +14,7 @@ You should have received a copy of the GNU General Public License along with Ken
 <https://www.gnu.org/licenses/>.
 """
 
+import datetime
 import os
 
 import crescent
@@ -100,5 +101,7 @@ CHANNEL_CHOICES = [
     ("dtd-automated-log", "579777361117970465"),
     ("lifestyle-log", "586471153141284866"),
 ]
+
+ERROR_LOG_PATH = os.path.normpath(os.path.join(os.getcwd(), "bot", "logs", f"{datetime.datetime.now()}.log"))
 
 database = Database()

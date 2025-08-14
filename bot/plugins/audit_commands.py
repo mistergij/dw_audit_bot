@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License along with Ken
 """
 
 import io
-import time
+import logging
 from datetime import datetime
 
 import aiosqlite
@@ -55,7 +55,7 @@ class GetMessage:
     channel_id = crescent.option(
         str,
         description="The ID of the message's channel.",
-        choices=[("#dtd-automated-log", "579777361117970465"), ("#lifestyle-log", "586471153141284866")],
+        choices=CHANNEL_CHOICES,
     )
     message_id = crescent.option(
         str,
@@ -66,6 +66,7 @@ class GetMessage:
     )
 
     async def callback(self, ctx: crescent.Context):
+        logging.info("/audit get_message command called.")
         message = await plugin.app.rest.fetch_message(int(self.channel_id), int(self.message_id))
         if self.content_type == 0:
             await ctx.respond(message)
@@ -76,7 +77,9 @@ class GetMessage:
                 f"**Description:** ```{embed.description}```\n"
                 f"**Fields:** {''.join([f'\nField {i}: \n```{value.name}\n{value.value}```' for i, value in enumerate(embed.fields)])}\n"
                 f"**Footer:** `{embed.footer}`\n"
+                f"**Timestamp:** `{message.timestamp.timestamp()}`\n"
             )
+        logging.info("/audit get_message command finished executing.")
 
 
 @plugin.include
@@ -87,7 +90,6 @@ class GetMessage:
 )
 class AuditDTDs:
     def __init__(self):
-        self.first_sql_id: int = sys.maxsize
         self.schema = {
             "message_id": pl.UInt64,
             "message_timestamp": pl.Float64,
@@ -102,12 +104,6 @@ class AuditDTDs:
             "char_name": pl.String,
         }
 
-    channel_id = crescent.option(
-        str,
-        name="channel",
-        description="The ID of the channel to audit.",
-        choices=CHANNEL_CHOICES,
-    ).convert(cvt.to_int)
     year = crescent.option(
         str,
         description="The year after which to audit.",
@@ -132,7 +128,7 @@ class AuditDTDs:
                     and (message.timestamp.timestamp() > database.earliest_audit)
                     and earliest_break
                 ):
-                    self.first_sql_id = message.id
+                    logging.debug("Breaking because data is already in tables.")
                     break
 
                 embed = message.embeds[0]
@@ -146,18 +142,28 @@ class AuditDTDs:
                     or ("is not a lifestyle-modifying background" in description)
                     or ("You do not have enough coins" in description)
                 ):
+                    logging.debug("Issue with description: %s", description)
                     continue
+
                 for field in embed.fields:
                     description += f"\n{field.name}\n{field.value}"
 
                 footer = embed.footer.text
 
                 if embed.title is None:
+                    logging.debug("Title not set")
+                    continue
+                if (
+                    ("Coinpurse" in embed.title)
+                    or ("Coin Purse" in embed.title)
+                ):
+                    logging.debug("Issue with title: %s", embed.title)
                     continue
                 elif "High-Risk Work" in embed.title:
                     to_audit = "hrw"
                     dtd_type = "N/A"
                 elif footer is None:
+                    logging.debug("Footer not set")
                     continue
                 elif "!guild" in footer:
                     to_audit = "guild"
@@ -177,22 +183,30 @@ class AuditDTDs:
                 elif "lifestyle" in footer:
                     to_audit = "lifestyle"
                     dtd_type = "N/A"
+                elif "transaction" in footer:
+                    to_audit = "transactions"
+                    dtd_type = "N/A"
                 else:
+                    logging.debug("Not searchable message: %s", footer)
                     continue
-                if to_audit != "train":
-                    query = f"INSERT INTO {to_audit} VALUES (:message_id,:timestamp,:dtd_remaining,:old_purse,:new_purse,:lifestyle,:injuries,:dtd_type,:user_id,:user_name,:char_name);"
-                else:
+                if to_audit == "train":
                     query = f"INSERT INTO {to_audit} VALUES (:message_id,:timestamp,:dtd_remaining,:old_purse,:new_purse,:lifestyle,:injuries,:dtd_type,:user_id,:user_name,:char_name,:xp_gained);"
+                elif to_audit == "transactions":
+                    query = f"INSERT INTO {to_audit} VALUES (:message_id,:timestamp,:dtd_remaining,:old_purse,:new_purse,:lifestyle,:injuries,:dtd_type,:user_id,:user_name,:char_name,:description);"
+                else:
+                    query = f"INSERT INTO {to_audit} VALUES (:message_id,:timestamp,:dtd_remaining,:old_purse,:new_purse,:lifestyle,:injuries,:dtd_type,:user_id,:user_name,:char_name);"
 
                 message_id = message.id
                 message_timestamp = message.timestamp
                 dtd_remaining = description.count("◉")
-                old_purse = re2.search(r"(\d+\.\d+)gp ->", description)
+                old_purse = re2.search(r"(\d+\.\d+)gp -> \d+\.\d+gp \(", description)
                 new_purse = re2.search(r"-> (\d+\.\d+)", description)
                 lifestyle = re2.search(r"Lifestyle:?\*\*:? ([^\n\r]+)", description)
                 injuries = re2.search(r"Injuries:?\*\*:? ([^\n\r]+)", description)
                 user_id_and_name = re2.search(r"Player:?\*\*:? <@(\d+)> `([^`\n\r]+)", description)
                 char_name = re2.search(r"Character:?\*\*:? ([^\n]+)", description)
+                if char_name is None:
+                    char_name = re2.match(r"(.+)makes a transaction!", embed.title)
                 xp_gained = re2.search(r"XP Gained:?\*\*:? (\d+)", description)
 
                 try:
@@ -209,8 +223,9 @@ class AuditDTDs:
                             "dtd_type": dtd_type,
                             "user_id": 0 if user_id_and_name is None else user_id_and_name[1],
                             "user_name": "Unknown" if user_id_and_name is None else user_id_and_name[2],
-                            "char_name": re2.sub(r"\s\(\d+\)", "", char_name[1]),
+                            "char_name": char_name[1].strip(),
                             "xp_gained": None if xp_gained is None else int(xp_gained[1]),
+                            "description": embed.description,
                         },
                     )
                     await database.connection.commit()
@@ -230,13 +245,13 @@ class AuditDTDs:
         num_options = len(filtered_options_list)
         match num_options:
             case 0:
-                query = "SELECT raw_xp_appended.* from raw_xp_appended INNER JOIN filtered_all ON raw_xp_appended.message_id = filtered_all.rowid WHERE raw_xp_appended.message_timestamp > :timestamp"
+                query = "SELECT raw_appended.* from raw_appended INNER JOIN filtered_all ON raw_appended.message_id = filtered_all.rowid WHERE raw_appended.message_timestamp > :timestamp ORDER BY message_timestamp"
             case 1:
-                query = "SELECT raw_xp_appended.* from raw_xp_appended INNER JOIN filtered_all ON raw_xp_appended.message_id = filtered_all.rowid WHERE filtered_all MATCH :search_1 AND raw_xp_appended.message_timestamp > :timestamp"
+                query = "SELECT raw_appended.* from raw_appended INNER JOIN filtered_all ON raw_appended.message_id = filtered_all.rowid WHERE filtered_all MATCH :search_1 AND raw_appended.message_timestamp > :timestamp ORDER BY message_timestamp"
             case 2:
-                query = "SELECT raw_xp_appended.* from raw_xp_appended INNER JOIN filtered_all ON raw_xp_appended.message_id = filtered_all.rowid WHERE filtered_all MATCH :search_1 AND filtered_all MATCH :search_2 AND raw_xp_appended.message_timestamp > :timestamp"
+                query = "SELECT raw_appended.* from raw_appended INNER JOIN filtered_all ON raw_appended.message_id = filtered_all.rowid WHERE filtered_all MATCH :search_1 AND filtered_all MATCH :search_2 AND raw_appended.message_timestamp > :timestamp ORDER BY message_timestamp"
             case 3:
-                query = "SELECT raw_xp_appended.* from raw_xp_appended INNER JOIN filtered_all ON raw_xp_appended.message_id = filtered_all.rowid WHERE filtered_all MATCH :search_1 AND filtered_all MATCH :search_2 AND filtered_all MATCH :search_3 AND raw_xp_appended.message_timestamp > :timestamp"
+                query = "SELECT raw_appended.* from raw_appended INNER JOIN filtered_all ON raw_appended.message_id = filtered_all.rowid WHERE filtered_all MATCH :search_1 AND filtered_all MATCH :search_2 AND filtered_all MATCH :search_3 AND raw_appended.message_timestamp > :timestamp ORDER BY message_timestamp"
             case _:
                 raise ArgumentError(filtered_options_list)
 
@@ -254,37 +269,41 @@ class AuditDTDs:
         )
 
     async def callback(self, ctx: crescent.Context) -> None:
-        start = time.perf_counter()
+        logging.info("/audit full command called.")
         await ctx.respond("Audit started. This may take a few minutes. Please wait...")
         aware_date = cvt.convert_date(f"{self.year}-{self.month}-{self.day}")
+        for channel_name, channel_id in CHANNEL_CHOICES:
+            logging.debug(f"Fetching messages from channel: {channel_name}")
+            message_iterator: hikari.LazyIterator[hikari.Message] = plugin.app.rest.fetch_messages(
+                int(channel_id), after=aware_date
+            )
 
-        message_iterator: hikari.LazyIterator[hikari.Message] = plugin.app.rest.fetch_messages(
-            int(self.channel_id), after=aware_date
-        )
-
-        # Find messages not yet in database
-        await self.update_tables(message_iterator, True)
+            # Find messages not yet in database
+            await self.update_tables(message_iterator, True)
+            logging.debug(f"Fetched messages from channel: {channel_name}")
 
         # Update variables to reflect new entries in database
         try:
             database.earliest_audit = min(aware_date.timestamp(), database.earliest_audit)
         except TypeError:
             database.earliest_audit = aware_date.timestamp()
+        logging.debug("Updated earliest audit")
 
         # Create cursor to find most recent timestamp in database
         cursor = await database.connection.execute(
             "SELECT message_timestamp FROM raw_all ORDER BY message_timestamp DESC LIMIT 1"
         )
         latest_sql_timestamp = await cursor.fetchone()
+        for channel_name, channel_id in CHANNEL_CHOICES:
+            message_iterator: hikari.LazyIterator[hikari.Message] = plugin.app.rest.fetch_messages(
+                int(channel_id),
+                after=cvt.convert_epoch(float(latest_sql_timestamp[0])),
+            )
 
-        message_iterator: hikari.LazyIterator[hikari.Message] = plugin.app.rest.fetch_messages(
-            int(self.channel_id),
-            after=cvt.convert_epoch(float(latest_sql_timestamp[0])),
-        )
+            # Find messages sent after SQL Database was last updated
+            await self.update_tables(message_iterator)
+
         await cursor.close()
-
-        # Find messages sent after SQL Database was last updated
-        await self.update_tables(message_iterator)
 
         # Fetch all messages stored in database
 
@@ -306,9 +325,7 @@ class AuditDTDs:
                 "text/csv",
             )
         )
-        end = time.perf_counter()
-        elapsed = end - start
-        print(f"/audit guild executed in {elapsed:.4f} seconds.")
+        logging.info(f"/audit full finished executing.")
 
 
 @plugin.include

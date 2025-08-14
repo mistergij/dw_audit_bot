@@ -45,7 +45,7 @@ audit_bot = hikari.GatewayBot(
                 "level": "DEBUG",
                 "stream": "ext://sys.stdout",
                 "formatter": "standard",
-            }
+            },
         },
         "loggers": {
             "": {  # root logger

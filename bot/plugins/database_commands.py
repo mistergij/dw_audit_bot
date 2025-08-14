@@ -14,6 +14,8 @@ You should have received a copy of the GNU General Public License along with Ken
 <https://www.gnu.org/licenses/>.
 """
 
+import logging
+
 import aiosqlite
 import crescent
 from sqlalchemy import create_engine
@@ -35,6 +37,7 @@ database_commands = crescent.Group("database")
 @plugin.include
 @crescent.event
 async def start_database(event: hikari.StartingEvent) -> None:
+    logging.debug(f"Database connection attempt started.")
     database.connection = await aiosqlite.connect(MAIN_DATABASE_PATH)
     database.engine = create_engine(f"sqlite:///{MAIN_DATABASE_PATH}")
     with open(EARLIEST_AUDIT_PATH, "r") as file:
@@ -45,11 +48,14 @@ async def start_database(event: hikari.StartingEvent) -> None:
     await database.connection.executescript(
         """BEGIN;
                 CREATE VIEW IF NOT EXISTS train_no_xp AS SELECT message_id, message_timestamp, remaining_dtd, old_purse, new_purse, lifestyle, injuries, dtd_type, user_id, user_name, char_name FROM train;
+                CREATE VIEW IF NOT EXISTS transactions_no_desc AS SELECT message_id, message_timestamp, remaining_dtd, old_purse, new_purse, lifestyle, injuries, dtd_type, user_id, user_name, char_name FROM transactions;
                 DROP VIEW IF EXISTS raw_all;
-                CREATE VIEW raw_all AS SELECT * FROM guild UNION SELECT * FROM business UNION SELECT * FROM ptw UNION SELECT * FROM hrw UNION SELECT * FROM odd UNION SELECT * FROM train_no_xp UNION SELECT * FROM lifestyle;
+                CREATE VIEW raw_all AS SELECT * FROM guild UNION SELECT * FROM business UNION SELECT * FROM ptw UNION SELECT * FROM hrw UNION SELECT * FROM odd UNION SELECT * FROM train_no_xp UNION SELECT * FROM lifestyle UNION SELECT * FROM transactions_no_desc;
                 DROP VIEW IF EXISTS raw_xp_appended;
                 CREATE VIEW raw_xp_appended AS SELECT raw_all.*, ifnull(train.xp_gained, 0) as xp_gained from raw_all left join train USING (message_id);
-                CREATE VIRTUAL TABLE IF NOT EXISTS filtered_all USING FTS5(message_id, dtd_type, user_id, char_name, content=raw_xp_appended, content_rowid=message_id);
+                DROP VIEW IF EXISTS raw_appended;
+                CREATE VIEW raw_appended AS SELECT raw_xp_appended.*, ifnull(transactions.description, 'N/A') as transaction_description from raw_xp_appended left join transactions USING (message_id);
+                CREATE VIRTUAL TABLE IF NOT EXISTS filtered_all USING FTS5(message_id, dtd_type, user_id, char_name, content=raw_appended, content_rowid=message_id);
                 INSERT INTO filtered_all(filtered_all) VALUES('rebuild');
                 CREATE TRIGGER IF NOT EXISTS filtered_all_ai_guild AFTER INSERT ON guild BEGIN 
                     INSERT INTO filtered_all(rowid, dtd_type, user_id, char_name) VALUES (new.message_id, new.dtd_type, new.user_id, new.char_name);
@@ -95,15 +101,18 @@ async def start_database(event: hikari.StartingEvent) -> None:
                 END;
             COMMIT;"""
     )
+    logging.debug(f"Database connection established.")
 
 
 @plugin.include
 @crescent.event
 async def close_database(event: hikari.StoppingEvent) -> None:
+    logging.debug(f"Attempting to close database connection.")
     await database.connection.commit()
     await database.connection.close()
     with open(EARLIEST_AUDIT_PATH, "w") as file:
         file.write(str(database.earliest_audit))
+    logging.debug(f"Database connection closed.")
 
 
 @plugin.include

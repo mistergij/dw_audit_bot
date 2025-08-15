@@ -143,45 +143,48 @@ class AuditDTDs:
                     description += f"\n{field.name}\n{field.value}"
 
                 footer = embed.footer.text
-
-                if embed.title is None:
-                    logging.debug("Title not set")
-                    continue
-                if (
-                    ("Coinpurse" in embed.title)
-                    or ("Coin Purse" in embed.title)
-                ):
-                    logging.debug("Issue with title: %s", embed.title)
-                    continue
-                elif "High-Risk Work" in embed.title:
-                    to_audit = "hrw"
-                    dtd_type = "N/A"
-                elif footer is None:
-                    logging.debug("Footer not set")
-                    continue
-                elif "!guild" in footer:
-                    to_audit = "guild"
-                    dtd_type = re2.match(r"\w+", footer[7:])[0].replace("assasinate", "assassinate")
-                elif "!business" in footer:
-                    to_audit = "business"
-                    dtd_type = re2.search(r"Business Category:?\*\*:? ([^\n\r]+)", description)[1]
-                elif "!ptw" in footer:
-                    to_audit = "ptw"
-                    dtd_type = "Part-Time Work"
-                elif "!odd" in footer:
-                    to_audit = "odd"
-                    dtd_type = re2.match(r"\w+", footer[5:])[0]
-                elif "train" in footer:
-                    to_audit = "train"
-                    dtd_type = "Combat Training"
-                elif "lifestyle" in footer:
-                    to_audit = "lifestyle"
-                    dtd_type = "N/A"
-                elif "transaction" in footer:
-                    to_audit = "transactions"
-                    dtd_type = "N/A"
-                else:
-                    logging.debug("Not searchable message: %s", footer)
+                try:
+                    if embed.title is None:
+                        logging.debug("Title not set")
+                        continue
+                    if (
+                        ("Coinpurse" in embed.title)
+                        or ("Coin Purse" in embed.title)
+                    ):
+                        logging.debug("Issue with title: %s", embed.title)
+                        continue
+                    elif "High-Risk Work" in embed.title:
+                        to_audit = "hrw"
+                        dtd_type = "N/A"
+                    elif footer is None:
+                        logging.debug("Footer not set")
+                        continue
+                    elif "!guild" in footer:
+                        to_audit = "guild"
+                        dtd_type = re2.match(r"\w+", footer[7:])[0].replace("assasinate", "assassinate")
+                    elif "!business" in footer:
+                        to_audit = "business"
+                        dtd_type = re2.search(r"Business Category:?\*\*:? ([^\n\r]+)", description)[1]
+                    elif "!ptw" in footer:
+                        to_audit = "ptw"
+                        dtd_type = "Part-Time Work"
+                    elif "!odd" in footer:
+                        to_audit = "odd"
+                        dtd_type = re2.match(r"\w+", footer[5:])[0]
+                    elif "train" in footer:
+                        to_audit = "train"
+                        dtd_type = "Combat Training"
+                    elif "lifestyle" in footer:
+                        to_audit = "lifestyle"
+                        dtd_type = "N/A"
+                    elif "transaction" in footer:
+                        to_audit = "transactions"
+                        dtd_type = "N/A"
+                    else:
+                        logging.debug("Not searchable message: %s", footer)
+                        continue
+                except TypeError as e:
+                    logging.debug(e, exc_info=True)
                     continue
                 if to_audit == "train":
                     query = f"INSERT INTO {to_audit} VALUES (:message_id,:timestamp,:dtd_remaining,:old_purse,:new_purse,:lifestyle,:injuries,:dtd_type,:user_id,:user_name,:char_name,:xp_gained);"

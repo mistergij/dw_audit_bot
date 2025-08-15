@@ -135,13 +135,6 @@ class AuditDTDs:
                 description = embed.description
                 if (
                     (description is None)
-                    or ("Insufficient downtime" in description)
-                    or ("This alias has been updated" in description)
-                    or ("No lifestyle was specified" in description)
-                    or ("is not a valid lifestyle" in description)
-                    or ("is not a lifestyle-modifying background" in description)
-                    or ("You do not have enough coins" in description)
-                    or ("You do not have enough marks" in description)
                 ):
                     logging.debug("Issue with description: %s", description)
                     continue
@@ -208,6 +201,8 @@ class AuditDTDs:
                 char_name = re2.search(r"Character:?\*\*:? ([^\n]+)", description)
                 if char_name is None:
                     char_name = re2.match(r"(.+)makes a transaction!", embed.title)
+                if char_name is None:
+                    continue
                 xp_gained = re2.search(r"XP Gained:?\*\*:? (\d+)", description)
 
                 try:

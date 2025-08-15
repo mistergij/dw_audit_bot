@@ -231,12 +231,14 @@ class AuditDTDs:
                 except aiosqlite.IntegrityError:
                     continue
                 except TypeError as e:
+                    print("ParsingError 1")
                     raise ParsingError(e, GUILD_ID, message.channel_id, message.id)
 
             # Handles if message does not have an Embed or if Embed doesn't have a Footer
             except (IndexError, AttributeError):
                 pass
             except TypeError as e:
+                print("parsingError 2")
                 raise ParsingError(e, GUILD_ID, message.channel_id, message.id)
 
     async def filter_tables(self, aware_date: datetime) -> pl.DataFrame:

@@ -183,7 +183,7 @@ class AuditDTDs:
                     else:
                         logging.debug("Not searchable message: %s", footer)
                         continue
-                except TypeError as e:
+                except Exception as e:
                     logging.debug(e, exc_info=True)
                     continue
                 if to_audit == "train":

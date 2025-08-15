@@ -8,7 +8,8 @@ result
 # Python
 .ruff_cache
 .ropeproject
-dw_audit_bot.egg-info/
+__pycache__/
+*.egg-info/
 logs/
 
 # SQLite

@@ -45,9 +45,9 @@ if DEV_IDS is None:
     raise ValueError("DEV_IDS environment variable is not set.")
 DEV_IDS = DEV_IDS.split(",")
 
-MAIN_DATABASE_PATH = os.path.join(os.getcwd(), "bot", "resources", "database.sqlite")
-GUILD_DATABASE_PATH = os.path.join(os.getcwd(), "bot", "resources", "guild.sqlite")
-EARLIEST_AUDIT_PATH = os.path.join(os.getcwd(), "bot", "resources", "earliest_audit.txt")
+MAIN_DATABASE_PATH = os.path.join(os.getcwd(), "resources", "database.sqlite")
+GUILD_DATABASE_PATH = os.path.join(os.getcwd(), "resources", "guild.sqlite")
+EARLIEST_AUDIT_PATH = os.path.join(os.getcwd(), "resources", "earliest_audit.txt")
 GUILD_DTD_CHOICES = [
     ("alchem", "alchem"),
     ("arcana", "arcana"),
@@ -103,7 +103,7 @@ CHANNEL_CHOICES = [
     ("transaction-log", "531011819095982081"),
 ]
 
-ERROR_LOG_PATH = os.path.normpath(os.path.join(os.getcwd(), "bot", "logs", f"{datetime.datetime.now()}.log"))
+ERROR_LOG_PATH = os.path.normpath(os.path.join(os.getcwd(), "logs", f"{datetime.datetime.now()}.log"))
 
 CHANNEL_LIST = []
 

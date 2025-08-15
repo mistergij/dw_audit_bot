@@ -141,6 +141,7 @@ class AuditDTDs:
                     or ("is not a valid lifestyle" in description)
                     or ("is not a lifestyle-modifying background" in description)
                     or ("You do not have enough coins" in description)
+                    or ("You do not have enough marks" in description)
                 ):
                     logging.debug("Issue with description: %s", description)
                     continue
